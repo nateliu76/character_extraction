@@ -41,14 +41,14 @@ def draw_grid_lines(matrix):
     box[ymin][i] = 0
     box[ymax][i] = 0
     
-  print_image(box, 'delete this', 'box_lines')
+  print_image(box, 'box_lines')
 
 
 '''
 Returns the image within the text bubble that encloses the coordinate of the cursor
 
 '''
-def crop_bubble(matrix, ycoord, xcoord, im):
+def crop_bubble(matrix, ycoord, xcoord):
   # records the max and min of x/y for copying to another list later
   # ymin, ymax, xmin, xmax
   boundary = [ycoord, ycoord, xcoord, xcoord]
@@ -87,7 +87,7 @@ def crop_bubble(matrix, ycoord, xcoord, im):
   test_image = [[100 if (i, j) in white_space else matrix[i][j] 
                 for j in xrange(xmin, xmax + 1)] \
                 for i in xrange(ymin, ymax + 1)]
-  print_image(test_image, im, 'text_block')
+  print_image(test_image, 'text_block')
   
   # 2nd pass, find all enclosed areas
   # check all adjacent pixels that are filled, run another
@@ -102,9 +102,9 @@ def crop_bubble(matrix, ycoord, xcoord, im):
   # print images for debug
   bord = [[0 if (i, j) in border_pixels else matrix[i][j] for j in xrange(xmin, xmax + 1)] \
                 for i in xrange(ymin, ymax + 1)]
-  print_image(bord, im, 'borders')
+  print_image(bord, 'borders')
   apply_threshold(bubble, WHITE_COLOR)
-  print_image(bubble, im, 'clean_block')
+  print_image(bubble, 'clean_block')
   
   return bubble
 
@@ -175,7 +175,7 @@ def apply_threshold(matrix, thres):
         matrix[i][j] = 255
 
       
-def print_image(matrix, im, fname):
+def print_image(matrix, fname):
   blk = (0, 0, 0)           # color black
   wht = (255, 255, 255)     # color white
   
@@ -216,7 +216,7 @@ def main():
     x, y = int(args[1]), int(args[2])
   
   # run flood fill algo
-  bubble = crop_bubble(pixels, y, x, im)
+  bubble = crop_bubble(pixels, y, x)
   
   # tighten boundaries and try drawing grid lines
   draw_grid_lines(bubble)
