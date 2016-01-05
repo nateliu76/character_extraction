@@ -1,6 +1,6 @@
 # character_extraction
 
-Needs Pillow to run: https://python-pillow.github.io/ 
+Dependencies: Pillow/PIL (https://python-pillow.github.io/)
 
 To run on command line:
 text_extraction.py image.png x_coordinate y_coordinate
