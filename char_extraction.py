@@ -3,6 +3,7 @@ import Queue
 from PIL import Image
 
 WHITE_COLOR = 245
+BLACK_COLOR = 10
 MIN_WHITE_PIX = 625
 THRES = 128
 directions = [(0, 1), (0, -1), (1, 0), (-1, 0)]
@@ -12,10 +13,41 @@ def max_black_sq(matrix):
   return
   
   
-def grid_lines(matrix):
-  return
+def draw_grid_lines(matrix):
+  xmin = len(matrix[0])
+  xmax = -1
+  ymin = len(matrix)
+  ymax = -1
+    
+  for i in xrange(len(matrix)):
+    for j in xrange(len(matrix[0])):
+      if matrix[i][j] <= BLACK_COLOR:
+        xmin = min(j, xmin)
+        xmax = max(j, xmax)
+        ymin = min(i, ymin)
+        ymax = max(i, ymax)
+  
+  xmin = xmin - 2 if xmin >= 2 else 0
+  xmax = xmax + 2 if xmax < len(matrix[0]) - 2 else -1
+  ymin = ymin - 2 if ymin >= 2 else 0
+  ymax = ymax + 2 if ymax < len(matrix) - 2 else -1
+  
+  # draw box for debug
+  box = [[matrix[i][j] for j in xrange(len(matrix[0]))] for i in xrange(len(matrix))]
+  for i in xrange(len(matrix)):
+    box[i][xmin] = 0
+    box[i][xmax] = 0
+  for i in xrange(len(matrix[0])):
+    box[ymin][i] = 0
+    box[ymax][i] = 0
+    
+  print_image(box, 'delete this', 'box_lines')
 
 
+'''
+Returns the image within the text bubble that encloses the coordinate of the cursor
+
+'''
 def crop_bubble(matrix, ycoord, xcoord, im):
   # records the max and min of x/y for copying to another list later
   # ymin, ymax, xmin, xmax
@@ -39,7 +71,7 @@ def crop_bubble(matrix, ycoord, xcoord, im):
   while not q.empty() and len(white_space) < MIN_WHITE_PIX:
     y, x = q.get()
     if matrix[y][x] >= WHITE_COLOR:
-      flood_fill(matrix, white_space, y, x, boundary)
+      flood_fill_white(matrix, white_space, y, x, boundary)
         
     for i, j in directions:
       next = (y + i, x + j)
@@ -55,19 +87,24 @@ def crop_bubble(matrix, ycoord, xcoord, im):
   test_image = [[100 if (i, j) in white_space else matrix[i][j] 
                 for j in xrange(xmin, xmax + 1)] \
                 for i in xrange(ymin, ymax + 1)]
-  print_image(test_image, im, 'boundary')
+  print_image(test_image, im, 'text_block')
   
   # 2nd pass, find all enclosed areas
   # check all adjacent pixels that are filled, run another
   # flood fill to find if that area is enclosed by white space
-  border = find_border(matrix, white_space, boundary)
+  border_pixels = find_border(matrix, white_space, boundary)
   
   # 3rd pass
   # copy all pixels within text bubble to a new 2D list
-  bubble = [[255 if (i, j) in border else matrix[i][j] for j in xrange(xmin, xmax + 1)] \
+  bubble = [[255 if (i, j) in border_pixels else matrix[i][j] for j in xrange(xmin, xmax + 1)] \
                 for i in xrange(ymin, ymax + 1)]
+
+  # print images for debug
+  bord = [[0 if (i, j) in border_pixels else matrix[i][j] for j in xrange(xmin, xmax + 1)] \
+                for i in xrange(ymin, ymax + 1)]
+  print_image(bord, im, 'borders')
   apply_threshold(bubble, WHITE_COLOR)
-  print_image(bubble, im, 'bubble')
+  print_image(bubble, im, 'clean_block')
   
   return bubble
 
@@ -78,24 +115,24 @@ def find_border(matrix, white_space, boundary):
   # do flood fill from the boundaries
   for i in xrange(xmin, xmax + 1):
     if (ymin, i) not in border and (ymin, i) not in white_space:
-      dfs(white_space, border, boundary, ymin, i)
+      flood_fill_non_white(white_space, border, boundary, ymin, i)
   
   for i in xrange(xmin, xmax + 1):
     if (ymax, i) not in border and (ymax, i) not in white_space:
-      dfs(white_space, border, boundary, ymax, i)
+      flood_fill_non_white(white_space, border, boundary, ymax, i)
       
   for i in xrange(ymin, ymax + 1):
     if (i, xmin) not in border and (i, xmin) not in white_space:
-      dfs(white_space, border, boundary, i, xmin)
+      flood_fill_non_white(white_space, border, boundary, i, xmin)
       
   for i in xrange(ymin, ymax + 1):
     if (i, xmax) not in border and (i, xmax) not in white_space:
-      dfs(white_space, border, boundary, i, xmax)
+      flood_fill_non_white(white_space, border, boundary, i, xmax)
 
   return border
 
 
-def dfs(white_space, border, boundary, ycoord, xcoord):
+def flood_fill_non_white(white_space, border, boundary, ycoord, xcoord):
   stack = [(ycoord, xcoord)]
   while stack:
     y, x = stack.pop()
@@ -106,7 +143,7 @@ def dfs(white_space, border, boundary, ycoord, xcoord):
         border.add(next)
     
   
-def flood_fill(matrix, white_space, ycoord, xcoord, boundary):
+def flood_fill_white(matrix, white_space, ycoord, xcoord, boundary):
   stack = [(ycoord, xcoord)]
   white_space.add((ycoord, xcoord))
   while stack:
@@ -130,10 +167,12 @@ def in_bounds(coord, limits):
   ymin, ymax, xmin, xmax = limits
   return i >= ymin and i <= ymax and j >= xmin and j <= xmax
   
+  
 def apply_threshold(matrix, thres):
   for i in xrange(len(matrix)):
     for j in xrange(len(matrix[0])):
-      matrix[i][j] = 255 if matrix[i][j] >= thres else matrix[i][j]
+      if matrix[i][j] >= thres:
+        matrix[i][j] = 255
 
       
 def print_image(matrix, im, fname):
@@ -143,8 +182,8 @@ def print_image(matrix, im, fname):
   pixels2 = [(matrix[i][j], matrix[i][j], matrix[i][j]) for i in xrange(len(matrix)) \
               for j in xrange(len(matrix[0]))]
   
-  im2 = Image.new(im.mode, (len(matrix[0]), len(matrix)))
-  im2 = im2.convert("RGB")
+  im2 = Image.new("RGB", (len(matrix[0]), len(matrix)))
+  # im2 = im2.convert("RGB")
   im2.putdata(pixels2)
   im2.save(fname + '.png', "PNG")
   
@@ -179,7 +218,8 @@ def main():
   # run flood fill algo
   bubble = crop_bubble(pixels, y, x, im)
   
-  # print_image(bubble, im)
+  # tighten boundaries and try drawing grid lines
+  draw_grid_lines(bubble)
 
 
 if __name__ == '__main__':
