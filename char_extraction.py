@@ -14,7 +14,7 @@ TO DO:
 
 
 WHITE_COLOR = 245
-BLACK_COLOR = 20
+BLACK_COLOR = 50
 MIN_WHITE_PIX = 625
 THRES = 128
 BUBBLE_MARGIN = 5
@@ -266,7 +266,7 @@ def search_for_bubble(matrix, ycoord=None, xcoord=None):
             print '\n%dth bubble found' % (bubble_count + 1)
             print 'Bubble found at:', boundary
             bubble_count += 1
-            boxes = add_grid_lines(bubble)
+            boxes = add_grid_lines(bubble, str(bubble_count))
             print_to_final_img(final_img, boxes, ymin + yoffset, xmin + xoffset, matrix)
             
   print_image(final_img, 'final_img')
