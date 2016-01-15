@@ -120,10 +120,8 @@ def find_border(matrix, white_space, boundary):
   
 def add_grid_lines(matrix, idx=''):
   print 'Adding grid lines...'
-  box = find_gaps(matrix, idx)
-  
-  # approach 2: merge boxes so that it forms something close to a square
-  boxes = process_boxes(box)
+  matrix_with_gaps = find_gaps(matrix, idx)
+  boxes = process_boxes(matrix_with_gaps)
   
   if DBG:
     merged_box_img = [list(x) for x in matrix]
@@ -147,7 +145,7 @@ def add_grid_lines(matrix, idx=''):
   
   
 def find_gaps(matrix, idx):
-  box = [list(x) for x in matrix]
+  matrix_with_gaps = [list(x) for x in matrix]
   vert_has_word = [0] * len(matrix)
   horz_has_word = [0] * len(matrix[0])
   
@@ -160,7 +158,7 @@ def find_gaps(matrix, idx):
   for i in xrange(len(matrix)):
     for j in xrange(len(matrix[0])):
       if vert_has_word[i] == 0 or horz_has_word[j] == 0:
-        box[i][j] = -1
+        matrix_with_gaps[i][j] = -1
   
   if DBG:
     box_img_thick = [list(x) for x in matrix]
@@ -170,17 +168,7 @@ def find_gaps(matrix, idx):
           box_img_thick[i][j] = 150
     print_image(box_img_thick, 'thick grids' + idx)
     
-    # approach 1: center grids
-    # center_grids(vert_has_word)
-    # center_grids(horz_has_word)
-    # box_img = [list(x) for x in matrix]
-    # for i in xrange(len(matrix)):
-      # for j in xrange(len(matrix[0])):
-        # if vert_has_word[i] == 0 or horz_has_word[j] == 0:
-          # box_img[i][j] = 100
-    # print_image(box_img, 'thin grids' + idx)
-    
-  return box
+  return matrix_with_gaps
   
 '''
 TODO:
@@ -256,17 +244,36 @@ def process_boxes(matrix):
   # put all boxes to Text_bubble class
   bubbles = convert_boxes_to_bubbles(boxes, matrix)
   
+  if DBG:
+    boxes_img = [[100 if pix == -1 else pix for pix in row] for row in matrix]
+    for bubble in bubbles:
+      ymin, ymax, xmin, xmax, ylen, xlen, ratio, has_word = bubble.unpack()
+      if has_word:
+        ystart = max(0, ymin - CHAR_MARGIN)
+        yend = min(len(matrix) - 1, ymax + CHAR_MARGIN)
+        xstart = max(0, xmin - CHAR_MARGIN)
+        xend = min(len(matrix[0]) - 1, xmax + CHAR_MARGIN)
+        for i in xrange(ystart, yend + 1):
+          boxes_img[i][xstart] = -2
+          boxes_img[i][xend] = -2
+        for j in xrange(xstart, xend + 1):
+          boxes_img[ystart][j] = -2
+          boxes_img[yend][j] = -2
+    print_image(boxes_img, 'bubbles_pre_merge')
+  
   # merge bubbles
   final_bubbles = []
   for bubble in bubbles:
+    # print '\nraw bubble:', bubble.unpack_all()
     # if already matched, skip
-    if bubble.matched:
+    if bubble.matched or not bubble.has_word:
       continue
     # try and match with others if necessary
     if bubble.ratio < RATIO_THRES:
       bubble = merge_bubbles(bubble)
     if bubble.is_valid_box():
       final_bubbles.append(bubble)
+      # print 'bubble data:', bubble.unpack_all()
     
   return [bubble.unpack() for bubble in final_bubbles]
 
@@ -412,6 +419,7 @@ def box_ratio(ylen, xlen):
 added condition in which words will be at least 2 pixels apart
 TODO:
 there is one case that will break this
+also, put black pix condition here
 
 '''
 def get_dimensions(matrix, ycoord, xcoord, processed):
