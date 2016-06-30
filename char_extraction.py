@@ -21,11 +21,12 @@ Current flow
 
 TODO:
   Possible improvements:
-    1. code cleanup and add comments
-    2. better filtering so light colored parts don't get cropped off?
+     - better filtering so light colored parts don't get cropped off?
     
-    Features/improvements:
-     - optimize performance
+    Other improvements:
+     - add performance measurement
+     - cleanup code
+     - add comments
 
 '''
 
@@ -46,6 +47,9 @@ MIN_BLK_PIX = 3
 MIN_BOX_SIZE = 8
 MAX_BOX_SIZE = 40000
 SUBBUBBLE_BOUNDARY = 15
+GAP_COLOR = -1
+GREEN_MARK = -2
+RED_MARK = -3
 
 directions = [(0, 1), (0, -1), (1, 0), (-1, 0)]
 matrix_bounds = None
@@ -98,7 +102,7 @@ def mark_text_blocks(matrix, idx=''):
   processed_blocks = get_blocks_from_subbubble(raw_subbubbles)
   
   if DBG:
-    boxes_img = [[100 if pix == -1 else pix for pix in row] \
+    boxes_img = [[100 if is_gap(pix) else pix for pix in row] \
                                   for row in matrix_w_gaps]
     write_blocks_to_img(boxes_img, processed_blocks)
     print_image(boxes_img, 'bubbles_pre_merge')
@@ -125,16 +129,17 @@ def separate_subbubbles(matrix_w_gaps):
   subbubbles = []
   for i, y in enumerate(matrix_w_gaps):
     for j, pix_val in enumerate(y):
-      if pix_val >= WHITE_COLOR and (i, j) not in visited:
+      if is_white_pixel(pix_val) and (i, j) not in visited:
         subbubble = get_subbubble(matrix_w_gaps, i, j, visited)
-        subbubbles.append(subbubble)
-        print 'found subbubble:', str(len(subbubbles))
+        if subbubble:
+          subbubbles.append(subbubble)
+          print 'found subbubble:', str(len(subbubbles))
       else:
         visited.add((i, j))
     
   # print the boundaries of the subbubble in the image
   if DBG:
-    subbubble_img = [[100 if pix == -1 else pix for pix in row] \
+    subbubble_img = [[100 if is_gap(pix) else pix for pix in row] \
                                       for row in matrix_w_gaps]
     subbubble_blocks = [subbubble_to_Text_block(sb) for sb in subbubbles]
     write_blocks_to_img(subbubble_img, subbubble_blocks)
@@ -162,45 +167,58 @@ def subbubble_to_Text_block(subbubble):
                     0, 0, 0, 1)
 
 
-# TODO: optimize by checking if black pixels exist within the subbubble
-# if not, return nothing
-# also, optimize this to only reach out accross borders if bordering a gap
-# this will greatly improve performance
+# TODO: possible to further optimize this by finding the border of the rectangle 
+# instead of using flood fill.
 def get_subbubble(matrix, ycoord, xcoord, all_visited):
   visited = set()
   stack = [(ycoord, xcoord)]
   ymin, ymax, xmin, xmax = ycoord, ycoord, xcoord, xcoord
+  boundary = [0, len(matrix) - 1, 0, len(matrix[0]) - 1]
+  blk_pix_exist = False
   
   while stack:
     y, x = stack.pop()
-    ystart = max(0, y - SUBBUBBLE_BOUNDARY)
-    yend = min(len(matrix), y + SUBBUBBLE_BOUNDARY + 1)
-    xstart = max(0, x - SUBBUBBLE_BOUNDARY)
-    xend = min(len(matrix[0]), x + SUBBUBBLE_BOUNDARY + 1)
-    
-    if ystart < ymin:
-      ymin = ystart
-    if yend > ymax:
-      ymax = yend
-    if xstart < xmin:
-      xmin = xstart
-    if xend > xmax:
-      xmax = xend
+    if y < ymin:
+      ymin = y
+    if y > ymax:
+      ymax = y
+    if x < xmin:
+      xmin = x
+    if x > xmax:
+      xmax = x
       
-    for i in xrange(ystart, yend):
-      for j in xrange(xstart, xend):
-        if (i, j) not in visited:
-          visited.add((i, j))
-          if matrix[i][j] != -1:
-            stack.append((i, j))
+    if is_black_pixel(matrix[y][x]) and not blk_pix_exist:
+      blk_pix_exist = True
+    
+    # put the nearby 4 pixels onto the stack if they are not part of the border
+    for dy, dx in directions:
+      i = y + dy
+      j = x + dx
+      if is_in_bounds((i, j), boundary) and (i, j) not in visited:
+        visited.add((i, j))
+        if not is_gap(matrix[i][j]):
+          stack.append((i, j))
+        else:
+          # if current pixel is neighboring a border, search in that direction
+          for count in xrange(SUBBUBBLE_BOUNDARY - 1):
+            i += dy
+            j += dx
+            if not is_in_bounds((i, j), boundary):
+              break
+            if (i, j) not in visited and not is_gap(matrix[i][j]):
+              visited.add((i, j))
+              stack.append((i, j))
 
   # copy the subbubble portion of the image into its own matrix
-  subbubble_matrix = [[matrix[i][j] if (i, j) in visited and matrix[i][j] != -1 else 255 \
-                                      for j in xrange(xmin, xmax)] \
-                                      for i in xrange(ymin, ymax)]
+  subbubble_matrix = [[255] * (xmax - xmin + 1) for j in xrange(ymin, ymax + 1)]
+  for pixel in visited:
+    y, x = pixel
+    if not is_gap(matrix[y][x]):
+      subbubble_matrix[y - ymin][x - xmin] = matrix[y][x]
+  
   all_visited |= visited
-  # TODO: use named tuple instead
-  return subbubble_matrix, ymin, xmin
+  if blk_pix_exist:
+    return subbubble_matrix, ymin, xmin
 
   
 '''
@@ -253,14 +271,14 @@ def mark_gaps(matrix, idx):
   
   for i, y in enumerate(matrix):
     for j, x in enumerate(y):
-      if x <= BLACK_COLOR:
+      if is_black_pixel(x):
         vert_has_word[i] = 1
         horz_has_word[j] = 1
         
   for i in xrange(len(matrix)):
     for j in xrange(len(matrix[0])):
       if vert_has_word[i] == 0 or horz_has_word[j] == 0:
-        matrix_w_gaps[i][j] = -1
+        matrix_w_gaps[i][j] = GAP_COLOR
   
   if DBG:
     gaps_marked = [list(x) for x in matrix]
@@ -284,7 +302,7 @@ def mark_gaps_within_block(matrix, block):
   
   for i in xrange(ymin, ymax + 1):
     for j in xrange(xmin, xmax + 1):
-      if matrix[i][j] <= BLACK_COLOR and matrix[i][j] >= 0:
+      if is_black_pixel(matrix[i][j]) and not is_gap(matrix[i][j]):
         vert_has_word[i - ymin] = 1
         horz_has_word[j - xmin] = 1
         
@@ -292,13 +310,13 @@ def mark_gaps_within_block(matrix, block):
     for i in xrange(ymin, ymax + 1):
         if vert_has_word[i - ymin] == 0:
           for j in xrange(xmin, xmax + 1):
-            matrix[i][j] = -1
+            matrix[i][j] = GAP_COLOR
   
   if xlen > WORD_BREAK_MIN_LEN:
     for j in xrange(xmin, xmax + 1):
         if horz_has_word[j - xmin] == 0:
           for i in xrange(ymin, ymax + 1):
-            matrix[i][j] = -1
+            matrix[i][j] = GAP_COLOR
   
   
 '''
@@ -310,12 +328,12 @@ def convert_img_to_blocks(matrix_w_gaps, idx=''):
   blocks = []
   for i, row in enumerate(matrix_w_gaps):
     for j, pix in enumerate(row):
-      if pix != -1 and (i, j) not in processed:
+      if not is_gap(pix) and (i, j) not in processed:
         block = get_block_parameters(matrix_w_gaps, i, j, processed)
         blocks.append(block)
       
   if DBG:
-    boxes_img = [[100 if pix == -1 else pix for pix in row] \
+    boxes_img = [[100 if is_gap(pix) else pix for pix in row] \
                                   for row in matrix_w_gaps]
     write_blocks_to_img(boxes_img, blocks)
     print_image(boxes_img, 'boxes_preliminary' + idx)
@@ -329,7 +347,8 @@ be used for merging blocks later.
 
 '''
 def mark_adj_blocks(blocks, matrix_w_gaps):
-  regions = [[-1] * len(matrix_w_gaps[0]) for x in xrange(len(matrix_w_gaps))]
+  DEFAULT_VAL = -1
+  regions = [[DEFAULT_VAL] * len(matrix_w_gaps[0]) for x in xrange(len(matrix_w_gaps))]
   
   # first pass, mark idx for different blocks
   for idx, block in enumerate(blocks):
@@ -349,7 +368,7 @@ def mark_adj_blocks(blocks, matrix_w_gaps):
     # search right
     right_idx = -1
     for j in xrange(xmax + xoffset + 1, len(matrix_w_gaps[0])):
-      if regions[ymid][j] != -1:
+      if regions[ymid][j] != DEFAULT_VAL:
         right_idx = regions[ymid][j]
         break
     if right_idx != -1:
@@ -359,7 +378,7 @@ def mark_adj_blocks(blocks, matrix_w_gaps):
     # search down
     down_idx = -1
     for i in xrange(ymax + yoffset + 1, len(matrix_w_gaps)):
-      if regions[i][xmid] != -1:
+      if regions[i][xmid] != DEFAULT_VAL:
         down_idx = regions[i][xmid]
         break
     if down_idx != -1:
@@ -442,11 +461,11 @@ def write_blocks_to_img(matrix, blocks):
       xstart = max(0, xmin - CHAR_MARGIN + xoffset)
       xend = min(len(matrix[0]) - 1, xmax + CHAR_MARGIN + xoffset)
       for i in xrange(ystart, yend + 1):
-        matrix[i][xstart] = -1
-        matrix[i][xend] = -1
+        matrix[i][xstart] = GREEN_MARK
+        matrix[i][xend] = GREEN_MARK
       for j in xrange(xstart, xend + 1):
-        matrix[ystart][j] = -1
-        matrix[yend][j] = -1
+        matrix[ystart][j] = GREEN_MARK
+        matrix[yend][j] = GREEN_MARK
 
 
 '''
@@ -457,16 +476,12 @@ and return the block in the Text_block class.
 def get_block_parameters(matrix, ycoord, xcoord, processed):
   blk_pix_cnt = 0
   
-  # print 
-  # print 'matrix dimensions:', len(matrix), len(matrix[0])
-  # print 'starting from:', ycoord, xcoord
-  
   i = ycoord
   while y_gap_is_small(matrix, i, xcoord):
     j = xcoord
     while x_gap_is_small(matrix, i, j):
       processed.add((i, j))
-      if matrix[i][j] <= BLACK_COLOR and matrix[i][j] >= 0:
+      if is_black_pixel(matrix[i][j]):
         blk_pix_cnt += 1
       j += 1
     i += 1
@@ -483,16 +498,16 @@ right now define a valid gap between words needs to be at least 2 pixels
 '''
 def y_gap_is_small(matrix, i, j):
   if i < len(matrix) - 1:
-    return matrix[i][j] != -1 or matrix[i + 1][j] != -1
+    return not is_gap(matrix[i][j]) or not is_gap(matrix[i + 1][j])
   else:
-    return i < len(matrix) and matrix[i][j] != -1
+    return i < len(matrix) and not is_gap(matrix[i][j])
   
   
 def x_gap_is_small(matrix, i, j):
   if j < len(matrix[0]) - 1:
-    return matrix[i][j] != -1 or matrix[i][j + 1] != -1
+    return not is_gap(matrix[i][j]) or not is_gap(matrix[i][j + 1])
   else:
-    return j < len(matrix[0]) and matrix[i][j] != -1
+    return j < len(matrix[0]) and not is_gap(matrix[i][j])
   
 
 '''
@@ -515,7 +530,7 @@ def search_for_bubble_near_coord(matrix, ycoord, xcoord):
   
   while not q.empty():
     y, x = q.get()
-    if matrix[y][x] >= WHITE_COLOR:
+    if is_white_pixel(matrix[y][x]):
       flood_fill_white(matrix, visited_white_pix, y, x, boundary)
       if len(visited_white_pix) > MIN_WHITE_PIX:
         break
@@ -551,19 +566,18 @@ def get_blocks_in_entire_img(matrix):
   print 'Searching for bubbles...'
   for i, row in enumerate(matrix):
     for j, pix in enumerate(row):
-      if pix >= WHITE_COLOR and (i, j) not in visited:
+      if is_white_pixel(pix) and (i, j) not in visited:
         visited_white_pix = set()
         boundary = [i, i, j, j]  # ymin, ymax, xmin, xmax
         flood_fill_white(matrix, visited_white_pix, i, j, boundary)
         visited |= visited_white_pix
         ymin, ymax, xmin, xmax = boundary
-        # second condition added for right now to ensure we don't include the
-        # entire image, this is due to performance
-        # TODO: get rid of the 2nd condition when performance is more optimized
-        if len(visited_white_pix) > MIN_WHITE_PIX and (ymin != 0 or xmin != 0):
+        
+        if len(visited_white_pix) > MIN_WHITE_PIX:
           bubble, blk_pix_cnt, offsets = extract_text(matrix, boundary, \
                                           visited_white_pix, str(bubble_count))
           yoffset, xoffset = offsets
+          
           if bubble and blk_pix_cnt >= BLACK_PIX_THRES:
             print '\n%dth bubble found' % (bubble_count + 1)
             print 'Bubble found at:', boundary, 'from:', (i, j)
@@ -630,11 +644,11 @@ def write_to_final_img(final_img, blocks):
     xstart = max(0, xoffset + xmin - CHAR_MARGIN)
     xend = min(len(final_img[0]) - 1, xoffset + xmax + CHAR_MARGIN)
     for i in xrange(ystart, yend + 1):
-      final_img[i][xstart] = -1
-      final_img[i][xend] = -1
+      final_img[i][xstart] = GREEN_MARK
+      final_img[i][xend] = GREEN_MARK
     for j in xrange(xstart, xend + 1):
-      final_img[ystart][j] = -1
-      final_img[yend][j] = -1
+      final_img[ystart][j] = GREEN_MARK
+      final_img[yend][j] = GREEN_MARK
 
 
 '''
@@ -652,7 +666,9 @@ def extract_text(matrix, boundary, white_space, idx=''):
   clean_bubble = [[255 if (i, j) in background_pixels else matrix[i][j] \
                 for j in xrange(xmin, xmax + 1)] \
                 for i in xrange(ymin, ymax + 1)]
-  apply_threshold(clean_bubble, WHITE_COLOR, BLACK_COLOR)
+                
+  # don't need this right now
+  # apply_threshold(clean_bubble, WHITE_COLOR, BLACK_COLOR)
   
   if DBG:
     test_image1 = [[matrix[i][j] \
@@ -690,7 +706,7 @@ def tighten_bubble(matrix, idx):
   
   for i in xrange(len(matrix)):
     for j in xrange(len(matrix[0])):
-      if matrix[i][j] <= BLACK_COLOR:
+      if is_black_pixel(matrix[i][j]):
         black_pix_count += 1
         xmin = min(j, xmin)
         xmax = max(j, xmax)
@@ -773,7 +789,7 @@ def flood_fill_white(matrix, visited_white_pix, ycoord, xcoord, boundary):
       yn, xn = y + i, x + j
       next_pix = (yn, xn)
       if is_in_bounds(next_pix, matrix_bounds) and \
-          matrix[yn][xn] >= WHITE_COLOR and next_pix not in visited_white_pix:
+          is_white_pixel(matrix[yn][xn]) and next_pix not in visited_white_pix:
         stack.append(next_pix)
         visited_white_pix.add(next_pix)
 
@@ -788,6 +804,18 @@ def is_in_bounds(coord, limits):
   return i >= ymin and i <= ymax and j >= xmin and j <= xmax
   
   
+def is_black_pixel(val):
+  return val <= BLACK_COLOR and val >= 0
+
+
+def is_white_pixel(val):
+  return val >= WHITE_COLOR
+  
+
+def is_gap(val):
+  return val == -1
+
+
 '''
 Applies threshold on image. Not necessary to use if we use WHITE_COLOR and
 BLACK_COLOR when comparing.
@@ -806,9 +834,6 @@ def apply_threshold(matrix, white_thres=255, black_thres=0):
       
 '''
 Prints processed image matrix to image.
-special values that map to colors:
--1: green
--2: red
 
 '''
 def print_image(matrix, fname):
@@ -817,7 +842,7 @@ def print_image(matrix, fname):
   grn = (0, 255, 0)
   red = (255, 0, 0)
   
-  pixels2 = [grn if x == -1 else red if x == -2 else (x, x, x) 
+  pixels2 = [grn if x == GREEN_MARK else red if x == RED_MARK else (x, x, x) 
               for row in matrix for x in row]
   
   im2 = Image.new("RGB", (len(matrix[0]), len(matrix)))
