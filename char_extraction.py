@@ -1,5 +1,6 @@
 import sys, os
 import Queue
+import time
 from PIL import Image
 
 '''
@@ -185,23 +186,28 @@ def get_subbubble(matrix, ycoord, xcoord, all_visited):
     if x < xmin:
       xmin = x
     if x > xmax:
-      xmax = x  
+      xmax = x
     if is_black_pixel(matrix[y][x]):
       black_pix_count += 1
     
+    # put the nearby 4 pixels onto the stack if they are not part of the border
     for dy, dx in directions:
-      i, j = y, x
-      for count in xrange(SUBBUBBLE_BOUNDARY):
-        i += dy
-        j += dx
-        # break on the first pixel that is either not in bounds, or is part of 
-        # the subbubble
-        if not is_in_bounds((i, j), boundary):
-          break
-        if (i, j) not in visited and not is_gap(matrix[i][j]):
+      i = y + dy
+      j = x + dx
+      if is_in_bounds((i, j), boundary) and (i, j) not in visited:
+        visited.add((i, j))
+        if not is_gap(matrix[i][j]):
           stack.append((i, j))
-          visited.add((i, j))
-          break
+        else:
+          # if current pixel is neighboring a border, search in that direction
+          for count in xrange(SUBBUBBLE_BOUNDARY - 1):
+            i += dy
+            j += dx
+            if not is_in_bounds((i, j), boundary):
+              break
+            if (i, j) not in visited and not is_gap(matrix[i][j]):
+              visited.add((i, j))
+              stack.append((i, j))
 
   # copy the subbubble portion of the image into its own matrix
   # TODO: might be worth it to compare the performace between what is below
@@ -572,6 +578,7 @@ def get_all_blocks_in_image(matrix):
   final_img = [list(x) for x in matrix]
   visited = set()
   bubble_count = 0
+  bubble_matrices_w_offsets = []
   all_blocks = []
   print 'Searching for bubbles...'
   for i, row in enumerate(matrix):
@@ -580,22 +587,27 @@ def get_all_blocks_in_image(matrix):
         bubble_white_pix, bubble_boundary = get_bubble_parameters(matrix, i, j)
         visited |= bubble_white_pix
         
-        if is_enough_white_pix_for_bubble(len(bubble_white_pix)):
-          bubble_parameters = get_clear_image_w_text(matrix, bubble_boundary, \
+        # the main performance toll is on the processing the entire image for bubbles
+        # ymin, ymax, xmin, xmax = bubble_boundary
+        if is_enough_white_pix_for_bubble(len(bubble_white_pix)): # and (ymin != 0 or xmin != 0):
+          bubble_and_parameters = get_clear_image_w_text(matrix, bubble_boundary, \
                                           bubble_white_pix, str(bubble_count))
-          bubble, black_pix_count, offsets = bubble_parameters
-          yoffset, xoffset = offsets
+          bubble_matrix, black_pix_count, offsets = bubble_and_parameters
           
-          if bubble and is_enough_black_pix_for_block(black_pix_count):
+          if bubble_matrix and is_enough_black_pix_for_block(black_pix_count):
             print '\n%dth bubble found' % (bubble_count + 1)
             print 'Bubble found at:', bubble_boundary, 'from:', (i, j)
             bubble_count += 1
+            yoffset, xoffset = get_bubble_offsets(offsets, bubble_boundary)
+            bubble_matrices_w_offsets.append((bubble_matrix, yoffset, xoffset))
             
-            # TODO: append block to list of blocks, process them in another loop
-            ymin, ymax, xmin, xmax = bubble_boundary
-            blocks = get_blocks_enclosing_text(bubble, str(bubble_count))
-            all_blocks += [add_offsets(b, ymin + yoffset, xmin + xoffset) \
-                          for b in blocks]
+  # process all bubbles
+  for i, bubble_matrix_w_offsets in enumerate(bubble_matrices_w_offsets):
+    bubble_matrix, yoffset, xoffset = bubble_matrix_w_offsets
+    blocks = get_blocks_enclosing_text(bubble_matrix, str(i))
+    all_blocks += [add_offsets(b, yoffset, xoffset) for b in blocks]
+    
+  # process all subbubbles
   
   print "\nfinal step, resolving overlapping blocks..."
   final_blocks = resolve_overlapping_blocks(matrix, all_blocks)
@@ -608,6 +620,14 @@ def add_offsets(block, yoffset, xoffset):
   block.xoffset += xoffset
   return block
   
+  
+def get_bubble_offsets(tightened_bubble_additional_offsets, original_bubble_boundary):
+  yoffset, xoffset = tightened_bubble_additional_offsets
+  ymin, ymax, xmin, xmax = original_bubble_boundary
+  yoffset += ymin
+  xoffset += xmin
+  return yoffset, xoffset
+
 
 def resolve_overlapping_blocks(matrix, blocks):
   final_blocks = []
@@ -673,6 +693,8 @@ Marks the background to extract the text portion only, and in the end
 return the tightened bubble.
 
 '''
+# TODO: benchmark this portion of the program, seems like it consumes a lot
+# of time when processing larger images
 def get_clear_image_w_text(matrix, boundary, white_space, idx=''):
   print "Running 2nd flood fill from corners"
   
@@ -809,6 +831,7 @@ def get_bubble_parameters(matrix, ycoord, xcoord):
           is_white_pixel(matrix[yn][xn]) and next_pix not in visited:
         stack.append(next_pix)
         visited.add(next_pix)
+        
   return visited, (ymin, ymax, xmin, xmax)
 
         
@@ -875,6 +898,9 @@ MAIN
 def main():
   global DBG
   
+  start_time = time.time()
+  print 'starting to record time...'
+  
   args = sys.argv[1:]
   filename = args[0]
   print "Reading image file..."
@@ -898,6 +924,8 @@ def main():
     search_for_bubble_near_given_coord(pixels, y, x)
   else:
     get_all_blocks_in_image(pixels)
+    
+  print 'total run time:', (time.time() - start_time)
 
 
 if __name__ == '__main__':
