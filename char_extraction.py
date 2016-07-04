@@ -7,27 +7,45 @@ from PIL import Image
 Constants
 
 '''
+# if the current run is in debug mode or not
 DBG = 0
+# the minimum threshold for the pixel to be identified as white
 WHITE_COLOR = 245
+# the minimum threshold for the pixel to be identified as black
 BLACK_COLOR = 40
+# the minimum threshold for the number of white pixels for the area to be 
+# identified as a bubble
 MIN_WHITE_PIX = 625
-THRES = 128
+# the extra margin used when marking the area of a bubble
 BUBBLE_MARGIN = 5
+# the extra margin used to mark characters when printing to image
 CHAR_MARGIN = 2
-RATIO_THRES = 0.85
-MAX_BOX_NUM = 5
-BLACK_PIX_THRES = 20
+# the maximum ratio of the block to be considered for merging
+MERGE_RATIO_THRES = 0.85
+# the maximum number of blocks that can be merged to form a squarer block
+MAX_BLOCK_NUM = 5
+# the minimum block ratio for a it to not be dissected to more blocks
 DISSECT_RATIO_THRES = 0.6
+# the minimum length required for a block to be dissected further
 WORD_BREAK_MIN_LEN = 30
+# the minimum number of black pixels for the block to be considered valid
 MIN_BLACK_PIX = 3
+# the minimum block size for the block to be considered valid
 MIN_BLOCK_SIZE = 8
+# the maximum block size for the block to be considered valid
 MAX_BLOCK_SIZE = 40000
+# the maximum distance between rectangles for them to be considered in the same
+# subbubble
 SUBBUBBLE_BOUNDARY = 15
+# the constant used to mark gaps in a matrix
 GAP_COLOR = -1
+# the constant used to mark pixels green in a matrix
 GREEN_MARK = -2
+# the constant used to mark pixels green in a matrix
 RED_MARK = -3
-
+# the 4 directions right, left, down, up.
 directions = [(0, 1), (0, -1), (1, 0), (-1, 0)]
+# records the number of blocks dissected
 dissect_count = 0
 
 
@@ -510,7 +528,7 @@ block below it, or the block to the right of it.
 If the width height ratio is better than the original after merging, merge the
 blocks, and continue to try merging in that direction.
 
-The maximum number of boxes that can be merged is marked by MAX_BOX_NUM.
+The maximum number of boxes that can be merged is marked by MAX_BLOCK_NUM.
 
 The offsets are added to the final merged block since those parameters are lost 
 when constructing the new block.
@@ -522,7 +540,7 @@ def merge_w_nearby_blocks(block):
   if ylen > xlen:
     # try merging with block(s) to the right
     r_block = block.right
-    for i in xrange(MAX_BOX_NUM):
+    for i in xrange(MAX_BLOCK_NUM):
       if not r_block:
         break
       ymin1, ymax1, xmin1, xmax1, ylen1, xlen1, ratio1, \
@@ -540,7 +558,7 @@ def merge_w_nearby_blocks(block):
   else:
     # try merging with block(s) below
     d_block = block.down
-    for i in xrange(MAX_BOX_NUM):
+    for i in xrange(MAX_BLOCK_NUM):
       if not d_block:
         break
       ymin1, ymax1, xmin1, xmax1, ylen1, xlen1, ratio1, \
@@ -1168,7 +1186,7 @@ blocks.
 
 '''  
 def should_try_merging(ratio):
-  return ratio < RATIO_THRES
+  return ratio < MERGE_RATIO_THRES
   
   
 '''
