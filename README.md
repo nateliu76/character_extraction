@@ -1,5 +1,9 @@
 # character_extraction
 
+For character_extraction.py:
+
+This is used to prototype
+
 Dependencies: Pillow/PIL (https://python-pillow.github.io/)
 
 To run on command line in debug mode:
