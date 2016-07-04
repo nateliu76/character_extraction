@@ -4,30 +4,9 @@ import time
 from PIL import Image
 
 '''
-Current flow
-  1. detect bubble
-  2. extract text from bubble
-  3. crop extra white border
-  4. mark the "gaps" (white space between words)
-  5. find bubbles
-  6. find subbubbles for each bubble
-  7. convert all subbubbles into blocks
-      - find and mark gaps
-      - break down gaps into boxes
-      - further breakdown certain boxes
-      - merge blocks to form squares
-  8. make sure all bubbles have no overlap with each other, if overlap occurs,
-     favor the smaller bubble and delete the larger one.
-
-TODO:
-  Possible improvements:
-     - better filtering so light colored parts don't get cropped off?
-    
-    Other improvements:
-     - add comments
+Constants
 
 '''
-
 DBG = 0
 WHITE_COLOR = 245
 BLACK_COLOR = 40
@@ -38,7 +17,6 @@ CHAR_MARGIN = 2
 RATIO_THRES = 0.85
 MAX_BOX_NUM = 5
 BLACK_PIX_THRES = 20
-DISSECT_NUM = 1
 DISSECT_RATIO_THRES = 0.6
 WORD_BREAK_MIN_LEN = 30
 MIN_BLACK_PIX = 3
@@ -51,6 +29,7 @@ RED_MARK = -3
 
 directions = [(0, 1), (0, -1), (1, 0), (-1, 0)]
 dissect_count = 0
+
 
 '''
 Text block class.
@@ -92,20 +71,24 @@ class Text_block():
 
 
 '''
-Given a bubble image, return a list of subbubbles
+Given a bubble image, return a list of subbubbles.
+
+This is done by marking the gaps within a bubble matrix, and processing the 
+rectangles that are not marked as gaps.
+
+Each subbubble consists of the subbubble matrix, ymin, and xmin.
+ymin and xmin are offsets of the subbubble matrix within the bubble matrix.
 
 '''      
 def get_subbubbles_from_bubble(bubble_matrix, idx=''):
+  print 'finding all subbubbles of bubble...'
   bubble_matrix_w_gaps = mark_gaps_in_matrix(bubble_matrix, idx)
-  return get_subbubbles_from_bubble_matrix_w_gap(bubble_matrix_w_gaps)
   
-  
-'''
-Given a bubble image with the gaps marked, return a list of subbubbles
-
-'''  
-def get_subbubbles_from_bubble_matrix_w_gap(bubble_matrix_w_gaps):
-  print 'finding all subbubbles...'
+  # Each subbubble is given an index. and the index is inserted to the list of
+  # sets that correspond to where the rectangle is.
+  # Note that this can be replaced with a 2d list since we end up traversing the
+  # entire rectangle anyway in get_subbubble(), although it's slower (only by a
+  # few 10's of ms)
   yvisited = [set() for x in xrange(len(bubble_matrix_w_gaps))]
   xvisited = [set() for x in xrange(len(bubble_matrix_w_gaps[0]))]
   
@@ -113,9 +96,9 @@ def get_subbubbles_from_bubble_matrix_w_gap(bubble_matrix_w_gaps):
   subbubbles = []
   for i, y in enumerate(bubble_matrix_w_gaps):
     for j, pix_val in enumerate(y):
-      # might want to change is_white_pixel() to not is_gap()
-      if is_white_pixel(pix_val) and not already_visited(i, j, yvisited, xvisited):
-        subbubble = get_subbubble_opt(bubble_matrix_w_gaps, i, j, yvisited, xvisited, subbubble_idx)
+      if not is_gap(pix_val) and not already_visited(i, j, yvisited, xvisited):
+        subbubble = get_subbubble(bubble_matrix_w_gaps, i, j, \
+                                  yvisited, xvisited, subbubble_idx)
         subbubble_idx += 1
         if subbubble:
           subbubbles.append(subbubble)
@@ -132,6 +115,21 @@ def get_subbubbles_from_bubble_matrix_w_gap(bubble_matrix_w_gaps):
   return subbubbles
 
   
+'''
+Processes list of subbubbles to get the blocks.
+
+Gaps are marked for each subbubble, with further marking if certain boxes
+are identified that they should be further dissected.
+This can happen in the case where punctuation is introduced, and that the words
+don't align well.
+
+Blocks are merged if necessary to form squares (what most Chinese characters
+are like)
+
+Offsets for the subbubble (in relation to the bubble) are added to each block
+at the end.
+
+'''
 def get_blocks_from_subbubbles(subbubbles):
   blocks = []
   for i, subbubble in enumerate(subbubbles):
@@ -148,7 +146,8 @@ def get_blocks_from_subbubbles(subbubbles):
       write_blocks_to_img(boxes_img, processed_blocks)
       print_image(boxes_img, 'bubbles_pre_merge')
     
-    final_blocks = merge_blocks_to_form_squares(subbubble_w_gaps, processed_blocks)
+    final_blocks = \
+        merge_blocks_to_form_squares(subbubble_w_gaps, processed_blocks)
     
     # draw blocks on clean bubble
     if DBG:
@@ -162,7 +161,8 @@ def get_blocks_from_subbubbles(subbubbles):
 
   
 '''
-Quick hack for debugging/printing.
+Quick hack for debugging/printing, so that we can print/save the outline of a 
+subbubble in an image.
 
 '''
 def subbubble_to_Text_block(subbubble):
@@ -172,9 +172,12 @@ def subbubble_to_Text_block(subbubble):
                     0, 0, 0, 1)
 
 
-# due to an edge case, it might be worth it to only include a rectangle as part
-# of the subbubble if it contains black pixels
-def get_subbubble_opt(bubble_matrix_w_gaps, ycoord, xcoord, yvisited, xvisited, subbubble_idx):
+'''
+Returns the subbubble given a coordinate of the subbubble.
+
+'''
+def get_subbubble(bubble_matrix_w_gaps, ycoord, xcoord, yvisited, xvisited, \
+                  subbubble_idx):
   stack = [(ycoord, xcoord)]
   ymin, ymax, xmin, xmax = ycoord, ycoord, xcoord, xcoord
   ylimit = len(bubble_matrix_w_gaps)
@@ -185,31 +188,38 @@ def get_subbubble_opt(bubble_matrix_w_gaps, ycoord, xcoord, yvisited, xvisited, 
     y, x = stack.pop()
     
     # if this rectangle is already handled, skip
+    # else get the y/x min/max of the rectangle, and search for 
+    # neighboring rectangles
     if already_visited(y, x, yvisited, xvisited):
       continue
     else:
-      ymincurr, ymaxcurr, xmincurr, xmaxcurr = get_rect_boundary(bubble_matrix_w_gaps, y, x)
+      ymincurr, ymaxcurr, xmincurr, xmaxcurr = \
+          get_rect_boundary(bubble_matrix_w_gaps, y, x)
       ymin = min(ymin, ymincurr)
       ymax = max(ymax, ymaxcurr)
       xmin = min(xmin, xmincurr)
       xmax = max(xmax, xmaxcurr)
       
+      # Due to an edge case, it might be worth it to only include a rectangle 
+      # as part of the subbubble if it contains black pixels.
+      # consider this if the edge case happens where subbubbles within a bubble
+      # are not divided properly
       for i in xrange(ymincurr, ymaxcurr + 1):
         for j in xrange(xmincurr, xmaxcurr + 1):
           if is_black_pixel(bubble_matrix_w_gaps[i][j]):
             black_pix_count += 1
-      
-      # search for neighboring rectangles
-      # since all neighboring rectangles have the same length, starting from
-      # the middle should suffice
-      xmid = xmincurr + (xmaxcurr - xmincurr) / 2
-      ymid = ymincurr + (ymaxcurr - ymincurr) / 2
       
       # put current rectangle into yvisited and xvisited
       for i in xrange(ymincurr, ymaxcurr + 1):
         yvisited[i].add(subbubble_idx)
       for i in xrange(xmincurr, xmaxcurr + 1):
         xvisited[i].add(subbubble_idx)
+      
+      # search for neighboring rectangles
+      # since all neighboring rectangles have the same length, starting from
+      # the middle should suffice
+      xmid = xmincurr + (xmaxcurr - xmincurr) / 2
+      ymid = ymincurr + (ymaxcurr - ymincurr) / 2
       
       # search up
       for count in xrange(1, SUBBUBBLE_BOUNDARY + 1):
@@ -219,7 +229,6 @@ def get_subbubble_opt(bubble_matrix_w_gaps, ycoord, xcoord, yvisited, xvisited, 
         if not is_gap(bubble_matrix_w_gaps[yn][xmid]):
           stack.append((yn, xmid))
           break
-        
       # search down
       for count in xrange(1, SUBBUBBLE_BOUNDARY + 1):
         yn = ymaxcurr + count
@@ -228,7 +237,6 @@ def get_subbubble_opt(bubble_matrix_w_gaps, ycoord, xcoord, yvisited, xvisited, 
         if not is_gap(bubble_matrix_w_gaps[yn][xmid]):
           stack.append((yn, xmid))
           break
-      
       # search left
       for count in xrange(1, SUBBUBBLE_BOUNDARY + 1):
         xn = xmincurr - count
@@ -237,7 +245,6 @@ def get_subbubble_opt(bubble_matrix_w_gaps, ycoord, xcoord, yvisited, xvisited, 
         if not is_gap(bubble_matrix_w_gaps[ymid][xn]):
           stack.append((ymid, xn))
           break
-      
       # search right
       for count in xrange(1, SUBBUBBLE_BOUNDARY + 1):
         xn = xmaxcurr + count
@@ -249,16 +256,27 @@ def get_subbubble_opt(bubble_matrix_w_gaps, ycoord, xcoord, yvisited, xvisited, 
     
   if is_enough_black_pix_for_block(black_pix_count):
     # copy the subbubble portion of the image into its own matrix
-    subbubble_matrix = [[bubble_matrix_w_gaps[i][j] if not is_gap(bubble_matrix_w_gaps[i][j]) else 255 \
+    subbubble_matrix = [[bubble_matrix_w_gaps[i][j] \
+                        if not is_gap(bubble_matrix_w_gaps[i][j]) else 255 \
                                       for j in xrange(xmin, xmax + 1)] \
                                       for i in xrange(ymin, ymax + 1)]
+    
     return subbubble_matrix, ymin, xmin
 
 
+'''
+Checks given coordinate and see if it is already part of a subbubble.
+
+'''
 def already_visited(y, x, yvisited, xvisited):
   return len(yvisited[y] & xvisited[x]) > 0
 
 
+'''
+Given a coordinate of a rectangle in an image matrix with gaps marked, find the
+rectangle's ymin, ymax, xmin, xmax.
+
+'''
 def get_rect_boundary(bubble_matrix_w_gaps, y, x):
   ylimit = len(bubble_matrix_w_gaps)
   xlimit = len(bubble_matrix_w_gaps[0])
@@ -285,58 +303,11 @@ def get_rect_boundary(bubble_matrix_w_gaps, y, x):
   return ymin, ymax, xmin, xmax
 
   
-def get_subbubble(bubble_matrix_w_gaps, ycoord, xcoord, visited):
-  stack = [(ycoord, xcoord)]
-  visited[ycoord][xcoord] = True
-  ymin, ymax, xmin, xmax = ycoord, ycoord, xcoord, xcoord
-  boundary = (0, len(bubble_matrix_w_gaps) - 1, 0, len(bubble_matrix_w_gaps[0]) - 1)
-  black_pix_count = 0
-  
-  while stack:
-    y, x = stack.pop()
-    if y < ymin:
-      ymin = y
-    if y > ymax:
-      ymax = y
-    if x < xmin:
-      xmin = x
-    if x > xmax:
-      xmax = x
-    if is_black_pixel(bubble_matrix_w_gaps[y][x]):
-      black_pix_count += 1
-    
-    # TODO: hardcode this with 4 if statements?
-    for dy, dx in directions:
-      i = y + dy
-      j = x + dx
-      if is_in_bounds((i, j), boundary) and not visited[i][j]:
-        visited[i][j] = True
-        if not is_gap(bubble_matrix_w_gaps[i][j]):
-          stack.append((i, j))
-        else:
-          # if current pixel is neighboring a border, search in that direction
-          for count in xrange(SUBBUBBLE_BOUNDARY - 1):
-            i += dy
-            j += dx
-            if not is_in_bounds((i, j), boundary):
-              break
-            if not visited[i][j] and not is_gap(bubble_matrix_w_gaps[i][j]):
-              visited[i][j] = True
-              stack.append((i, j))
-
-  # copy the subbubble portion of the image into its own matrix
-  subbubble_matrix = [[bubble_matrix_w_gaps[i][j] if visited[i][j] \
-                       and not is_gap(bubble_matrix_w_gaps[i][j]) else 255 \
-                                      for j in xrange(xmin, xmax + 1)] \
-                                      for i in xrange(ymin, ymax + 1)]
-  
-  if is_enough_black_pix_for_block(black_pix_count):
-    return subbubble_matrix, ymin, xmin
-
-  
 '''
-Continues to break down blocks into smaller blocks if they are deformed
-(height width ratio is below threshold).
+Dissect blocks into smaller blocks if necessary (height width ratio is below 
+threshold).
+
+Returns the list of processed blocks.
 
 '''
 def dissect_uneven_blocks(matrix_w_gaps, blocks):
@@ -357,11 +328,10 @@ def dissect_uneven_blocks(matrix_w_gaps, blocks):
   
   
 '''
-Tries to merge Text_blocks so that they are all as close to a square as 
-possible.
+Identifies blocks to merge so that they are all as close to a square as 
+possible and tries to merge them.
 
-does this guarantee that we start from the top left?
-if not, how does that impact this?
+Returns the list of merged blocks.
 
 '''
 def merge_blocks_to_form_squares(matrix_w_gaps, blocks):
@@ -381,8 +351,12 @@ def merge_blocks_to_form_squares(matrix_w_gaps, blocks):
   
 '''
 Marks the locations of the image where the words don't exist.
-This is done by marking the x coordinates and y coordinates in which black pixels
-don't exist.
+This is done by marking the x coordinates and y coordinates in which black 
+pixels don't exist.
+
+The marked locations are called "gaps".
+
+Returns the matrix with marked gaps.
 
 '''
 def mark_gaps_in_matrix(matrix, idx):
@@ -414,7 +388,9 @@ def mark_gaps_in_matrix(matrix, idx):
 
   
 '''
-Like the function mark_gaps(), but for within a Text_block.
+Same as the function mark_gaps_in_matrix(), but for within a Text_block only.
+
+Instead of returning the image, it modifies it directly.
 
 '''
 def mark_gaps_in_block_to_matrix(matrix, block):
@@ -442,11 +418,12 @@ def mark_gaps_in_block_to_matrix(matrix, block):
   
   
 '''
-Converts image with marked grids to blocks.
+Converts image with gaps marked to blocks.
 
 '''
 def convert_img_to_blocks(matrix_w_gaps, idx=''):
-  processed = [[False] * len(matrix_w_gaps[0]) for x in xrange(len(matrix_w_gaps))]
+  processed = [[False] * len(matrix_w_gaps[0]) \
+              for x in xrange(len(matrix_w_gaps))]
   blocks = []
   for i, row in enumerate(matrix_w_gaps):
     for j, pix in enumerate(row):
@@ -463,8 +440,11 @@ def convert_img_to_blocks(matrix_w_gaps, idx=''):
   return blocks
   
   
+'''
+Same as the function convert_img_to_blocks(), but for within a block only.
+
+'''
 def convert_img_within_block_to_blocks(matrix_w_gaps, old_block):
-  # processed = set()
   ymin, ymax, xmin, xmax = old_block.get_bounds()
   processed = [[False] * (xmax - xmin + 1) for x in xrange(ymax - ymin + 1)]
   blocks = []
@@ -479,10 +459,9 @@ def convert_img_within_block_to_blocks(matrix_w_gaps, old_block):
   
 '''
 Mark which blocks are below or to the right of the block. This information will
-be used for merging blocks later.
+be used for merging blocks.
 
 '''
-# TODO: review this and see if able to make this cleaner...
 def mark_adj_blocks(blocks, matrix_w_gaps):
   DEFAULT_VAL = -1
   regions = [[DEFAULT_VAL] * len(matrix_w_gaps[0]) for x in xrange(len(matrix_w_gaps))]
@@ -491,12 +470,13 @@ def mark_adj_blocks(blocks, matrix_w_gaps):
   for idx, block in enumerate(blocks):
     ymin, ymax, xmin, xmax, ylen, xlen, ratio, blk_pix_cnt = block.unpack()
     yoffset, xoffset = block.get_offsets()
-    # TODO: actually we only need to mark the borders, and not the entire matrix
+    # actually we only need to mark the borders of the block, and not the entire
+    # matrix, not sure if it gains us any performance though
     for i in xrange(ymin + yoffset, ymax + yoffset + 1):
       for j in xrange(xmin + xoffset, xmax + xoffset + 1):
         regions[i][j] = idx
   
-  # second pass, connect nodes/blocks
+  # second pass, mark the blocks that are to the current block's right/down
   for block in blocks:
     ymin, ymax, xmin, xmax, ylen, xlen, ratio, blk_pix_cnt = block.unpack()
     yoffset, xoffset = block.get_offsets()
@@ -530,12 +510,17 @@ block below it, or the block to the right of it.
 If the width height ratio is better than the original after merging, merge the
 blocks, and continue to try merging in that direction.
 
+The maximum number of boxes that can be merged is marked by MAX_BOX_NUM.
+
+The offsets are added to the final merged block since those parameters are lost 
+when constructing the new block.
+
 '''
-# TODO: review this and see if able to make this cleaner...
 def merge_w_nearby_blocks(block):
   ymin, ymax, xmin, xmax, ylen, xlen, ratio, blk_pix_cnt = block.unpack()
   
   if ylen > xlen:
+    # try merging with block(s) to the right
     r_block = block.right
     for i in xrange(MAX_BOX_NUM):
       if not r_block:
@@ -553,6 +538,7 @@ def merge_w_nearby_blocks(block):
       else:
         break
   else:
+    # try merging with block(s) below
     d_block = block.down
     for i in xrange(MAX_BOX_NUM):
       if not d_block:
@@ -585,7 +571,7 @@ def box_ratio(ylen, xlen):
 
 
 '''
-Marks the boundaries of the Text_blocks.
+Marks the boundaries of the blocks, for printing/saving later.
 
 '''
 def write_blocks_to_img(matrix, blocks):
@@ -611,37 +597,44 @@ Given the top left coordinate of the block, find the parameters of the block,
 and return the block in the Text_block class.
 
 '''
-def get_block_parameters(matrix, ycoord, xcoord, processed, yoffset=0, xoffset=0):
+def get_block_parameters(matrix, ycoord, xcoord, processed, \
+                         yoffset=0, xoffset=0):
   blk_pix_cnt = 0
   
   i = ycoord
-  while y_gap_is_small(matrix, i, xcoord):
+  while y_not_reach_boundary(matrix, i, xcoord):
     j = xcoord
-    while x_gap_is_small(matrix, i, j):
+    while x_not_reach_boundary(matrix, i, j):
       processed[i - yoffset][j - xoffset] = True
       if is_black_pixel(matrix[i][j]):
         blk_pix_cnt += 1
+        
       j += 1
     i += 1
   
   ymin, ymax, xmin, xmax = ycoord, i - 1, xcoord, j - 1
   ylen, xlen = i - ycoord, j - xcoord
   ratio = box_ratio(ylen, xlen)
+  
   return Text_block(ymin, ymax, xmin, xmax, ylen, xlen, ratio, blk_pix_cnt)
 
 
 '''
-a valid gap between words needs to be at least 2 pixels
+Returns true if found a gap that is at least 2 pixels in the y axis direction.
 
 '''
-def y_gap_is_small(matrix, i, j):
+def y_not_reach_boundary(matrix, i, j):
   if i < len(matrix) - 1:
     return not is_gap(matrix[i][j]) or not is_gap(matrix[i + 1][j])
   else:
     return i < len(matrix) and not is_gap(matrix[i][j])
   
-  
-def x_gap_is_small(matrix, i, j):
+
+'''
+Returns true if found a gap that is at least 2 pixels in the x axis direction.
+
+'''  
+def x_not_reach_boundary(matrix, i, j):
   if j < len(matrix[0]) - 1:
     return not is_gap(matrix[i][j]) or not is_gap(matrix[i][j + 1])
   else:
@@ -649,14 +642,14 @@ def x_gap_is_small(matrix, i, j):
   
 
 '''
-Used mainly for debug.
+Currently used mainly for debug.
 
-Runs BFS around given coordinate to find white pixels, use flood fill to 
-find the boundaries of the bubble. Stops BFS when queue of white pixels
-are empty.
+Runs BFS around given coordinate to find nearby bubble and uses flood fill to 
+find the boundaries of the nearby bubble.
 
-Extracts texts using the boundaries found, and marks the text blocks in the
-end.
+This function was initially meant to simulate a mouse click on a given 
+coordinate on an image, which would kickstart the process of finding the bubble
+around that coordinate, and circle the words in that bubble.
 
 '''
 def search_for_bubble_near_given_coord(matrix, ycoord, xcoord):
@@ -673,67 +666,90 @@ def search_for_bubble_near_given_coord(matrix, ycoord, xcoord):
     y, x = q.get()
     
     if is_white_pixel(matrix[y][x]):
-      bubble_white_pix_count, bubble_boundary = get_bubble_parameters(matrix, y, x, visited_white_pix)
+      bubble_white_pix_count, bubble_boundary = \
+          get_bubble_parameters(matrix, y, x, visited_white_pix)
       if is_enough_white_pix_for_bubble(bubble_white_pix_count):
         break
         
     # visited needs to have only the non white pixels
     for i, j in directions:
       next_pix = (y + i, x + j)
-      if is_in_bounds(next_pix, matrix_bounds) and next_pix not in visited and not visited_white_pix[y + i][x + j]:
+      if is_in_bounds(next_pix, matrix_bounds) and next_pix not in visited \
+          and not visited_white_pix[y + i][x + j]:
         q.put(next_pix)
         visited.add(next_pix)
   
   ymin, ymax, xmin, xmax = bubble_boundary
-  is_bubble_white_pix = [[visited_white_pix[i][j] for j in xrange(xmin, xmax + 1)] for i in xrange(ymin, ymax + 1)]
+  is_white_pix_of_bubble = \
+      [[visited_white_pix[i][j] for j in xrange(xmin, xmax + 1)] \
+                                for i in xrange(ymin, ymax + 1)]
   
-  bubble_parameters = get_clear_image_w_text(matrix, bubble_boundary, is_bubble_white_pix)
+  bubble_parameters = \
+      get_clear_image_w_text(matrix, bubble_boundary, is_white_pix_of_bubble)
   
   bubble, black_pix_count, offsets = bubble_parameters
   if bubble and is_enough_black_pix_for_block(black_pix_count):
-    # this prints out the debug images
     subbubbles = get_subbubbles_from_bubble(bubble)
     
-    # get blocks from subbubbles
+    # TODO: add get_blocks_from_subbubbles() here
     
   else:
     print 'No bubble found with given coordinates'
 
 
 '''
-Searches the entire image for texts.
-The way this is done is by running the single bubble finding algorithm on all
-white pixels in the image.
-Flood fill is run on every white pixel, with heuristics to determine if the
-region is a text bubble.
+Searches the entire image for Chinese characters, and circles them with the
+Text_block class.
 
-Note that there will be false positives, but that is fine.
+This is done is by running the single bubble finding algorithm on all
+white pixels in the image, with heuristics to determine if the region is a text
+bubble.
 
+Note that there will be false positives (regions identified as Chinese 
+characters, but are actually not), but that is fine for the purpose of this
+program.
+
+Does the following in order
+ - Get all bubbles using bubble finding algorithm
+ - Get all subbubbles within each bubble
+ - Get all the blocks within each subbubble
+
+Saves the image with all characters marked for debug.
+
+Prints out performance related timing info as well.
+
+Note that at each step, offsets need to be added, this is because:
+ - Need offsets for bubble in relation to the image
+ - Need offsets for the tightened bubble in relation to the original bubble
+ - Need offsets for the subbubble in relation to the bubble
 
 '''
 def get_all_blocks_in_image(matrix):
-  final_img = [list(x) for x in matrix]
+  start_time = time.time()
+  
   visited_white_pix = [[False] * len(matrix[0]) for x in xrange(len(matrix))]
   bubble_count = 0
   bubble_matrices_w_offsets = []
-  subbubbles = []
   
-  start_time = time.time()
-  
+  # find all bubbles in the image
   print 'Searching for bubbles...'
   for i, row in enumerate(matrix):
     for j, pix in enumerate(row):
+    
       if is_white_pixel(pix) and not visited_white_pix[i][j]:
-        bubble_white_pix_count, bubble_boundary = get_bubble_parameters(matrix, i, j, visited_white_pix)
+        bubble_white_pix_count, bubble_boundary = \
+            get_bubble_parameters(matrix, i, j, visited_white_pix)
         
-        # the main performance toll is on the processing the entire image for bubbles
         if is_enough_white_pix_for_bubble(bubble_white_pix_count):
           ymin, ymax, xmin, xmax = bubble_boundary
-          is_bubble_white_pix = [[visited_white_pix[i][j] for j in xrange(xmin, xmax + 1)] for i in xrange(ymin, ymax + 1)]
+          is_white_pix_of_bubble = \
+              [[visited_white_pix[i][j] for j in xrange(xmin, xmax + 1)] \
+                                        for i in xrange(ymin, ymax + 1)]
           
           print '\ngetting clear image of text...'
-          bubble_and_parameters = get_clear_image_w_text(matrix, bubble_boundary, \
-                                          is_bubble_white_pix, str(bubble_count))
+          bubble_and_parameters = \
+              get_clear_image_w_text(matrix, bubble_boundary, \
+                                     is_white_pix_of_bubble, str(bubble_count))
           bubble_matrix, black_pix_count, offsets = bubble_and_parameters
           
           if bubble_matrix and is_enough_black_pix_for_block(black_pix_count):
@@ -748,14 +764,15 @@ def get_all_blocks_in_image(matrix):
   
   # process all bubbles to get subbubbles
   print '\nprocessing all bubbles...'
+  subbubbles = []
   for i, bubble_matrix_w_offsets in enumerate(bubble_matrices_w_offsets):
     bubble_matrix, yoffset, xoffset = bubble_matrix_w_offsets
     raw_subbubbles = get_subbubbles_from_bubble(bubble_matrix, str(i))
-    subbubbles += [add_subbubble_offsets(sb, yoffset, xoffset) for sb in raw_subbubbles]
+    subbubbles += \
+        [add_subbubble_offsets(sb, yoffset, xoffset) for sb in raw_subbubbles]
   
   print '\ntotal amount of bubbles:', len(bubble_matrices_w_offsets)
   print 'total amount of subbubbles:', len(subbubbles)
-  
   process_bubble_instant = time.time()
   process_bubble_time = process_bubble_instant - get_bubble_instant
   
@@ -765,13 +782,16 @@ def get_all_blocks_in_image(matrix):
   process_subbubble_instant = time.time()
   process_subbubble_time = process_subbubble_instant - process_bubble_instant
   
+  # resolve overlapping blocks
   print "\nresolving overlapping blocks..."
   final_blocks = resolve_overlapping_blocks(matrix, processed_blocks)
   
   print '\nfinal step, printing image...'
-  write_to_final_img(final_img, final_blocks)
+  final_img = [list(x) for x in matrix]
+  write_blocks_to_img(final_img, final_blocks)
   print_image(final_img, 'final_img')
   
+  # print performance related timings
   print '\nget bubbles from image time:', get_bubble_time
   print '\nget subbubbles from bubbles time:', process_bubble_time
   print '\nget blocks from subbubbles time:', process_subbubble_time
@@ -779,17 +799,34 @@ def get_all_blocks_in_image(matrix):
   print 
   
   
+'''
+Convenience method to add bubble offsets to subbubble offsets, and wrap them all
+in a tuple.
+
+'''
 def add_subbubble_offsets(subbubble, yoffset, xoffset):
   subbubble_matrix, yoffset1, xoffset1 = subbubble
   return subbubble_matrix, yoffset + yoffset1, xoffset + xoffset1
   
   
+'''
+Convenience method to add offsets to a block.
+
+'''
 def add_offsets(block, yoffset, xoffset):
   block.yoffset += yoffset
   block.xoffset += xoffset
   return block
   
   
+'''
+There are two sets of offsets in play here:
+ - the offset from the original image to the bubble
+ - the offset from the original bubble to the tightened bubble
+
+This method adds the two offsets together
+
+'''
 def get_bubble_offsets(tightened_bubble_additional_offsets, original_bubble_boundary):
   yoffset, xoffset = tightened_bubble_additional_offsets
   ymin, ymax, xmin, xmax = original_bubble_boundary
@@ -798,12 +835,21 @@ def get_bubble_offsets(tightened_bubble_additional_offsets, original_bubble_boun
   return yoffset, xoffset
 
 
+'''
+For overlapping blocks, favor the smaller block over the larger block.
+
+'''
 def resolve_overlapping_blocks(matrix, blocks):
   final_blocks = []
-  ypix = [set() for i in xrange(len(matrix))]
-  xpix = [set() for i in xrange(len(matrix[0]))]
   
+  # each block is given an index. and the index is inserted to the list of
+  # sets that correspond to where the block is.
+  yvisited = [set() for i in xrange(len(matrix))]
+  xvisited = [set() for i in xrange(len(matrix[0]))]
+  
+  # sort blocks from small to large in terms of area
   blocks.sort(key = lambda x: x.ylen * x.xlen)
+  
   for n, block in enumerate(blocks):
     ymin, ymax, xmin, xmax, ylen, xlen, ratio, blk_pix_count = block.unpack()
     yoffset, xoffset = block.get_offsets()
@@ -812,63 +858,48 @@ def resolve_overlapping_blocks(matrix, blocks):
     xstart = xoffset + xmin
     xend = xoffset + xmax
     
-    # check for overlaps
-    if is_overlap(ystart, yend, xstart, xend, ypix, xpix):
-      continue
-    else:
-      # add image to sets if no overlap
+    # if no overlap, add block to visited, and append to final list of blocks
+    if not is_overlap(ystart, yend, xstart, xend, yvisited, xvisited):
       final_blocks.append(block)
       for i in xrange(ystart, yend + 1):
-        ypix[i].add(n)
+        yvisited[i].add(n)
       for i in xrange(xstart, xend + 1):
-        xpix[i].add(n)
+        xvisited[i].add(n)
   
   return final_blocks
   
   
-def is_overlap(ystart, yend, xstart, xend, ypix, xpix):
+'''
+If both yvisited and xvisited contain the same index in the range specified,
+that means that the current block defined by the y/x min/max overlaps with the
+block with that index.
+
+'''
+def is_overlap(ystart, yend, xstart, xend, yvisited, xvisited):
   yoverlap = set()
   xoverlap = set()
   for i in xrange(ystart, yend + 1):
-    yoverlap |= ypix[i]
+    yoverlap |= yvisited[i]
   for i in xrange(xstart, xend + 1):
-    xoverlap |= xpix[i]
+    xoverlap |= xvisited[i]
   return len(yoverlap & xoverlap) > 0
-
-  
-def write_to_final_img(final_img, blocks):
-  for block in blocks:
-    ymin, ymax, xmin, xmax, ylen, xlen, ratio, blk_pix_count = block.unpack()
-    yoffset, xoffset = block.get_offsets()
-    
-    ystart = max(0, yoffset + ymin - CHAR_MARGIN)
-    yend = min(len(final_img) - 1, yoffset + ymax + CHAR_MARGIN)
-    xstart = max(0, xoffset + xmin - CHAR_MARGIN)
-    xend = min(len(final_img[0]) - 1, xoffset + xmax + CHAR_MARGIN)
-    
-    for i in xrange(ystart, yend + 1):
-      final_img[i][xstart] = GREEN_MARK
-      final_img[i][xend] = GREEN_MARK
-      
-    for j in xrange(xstart, xend + 1):
-      final_img[ystart][j] = GREEN_MARK
-      final_img[yend][j] = GREEN_MARK
 
 
 '''
-Extracts text from image given the boundaries of the bubble.
+Extracts the part of the image with text.
 
 Marks the background to extract the text portion only, and in the end 
 return the tightened bubble.
 
 '''
-def get_clear_image_w_text(matrix, boundary, white_space, idx=''):
+def get_clear_image_w_text(matrix, boundary, visited_white_pix, idx=''):
   print "Running 2nd flood fill from corners"
   
-  background_pixels = get_background_pixels(white_space, boundary, matrix)
-  ymin, ymax, xmin, xmax = boundary
+  background_pixels = get_background_pixels(visited_white_pix, boundary, matrix)
   
-  clean_bubble = [[255 if background_pixels[i][j] else matrix[i + ymin][j + xmin] \
+  ymin, ymax, xmin, xmax = boundary
+  clean_bubble = \
+      [[255 if background_pixels[i][j] else matrix[i + ymin][j + xmin] \
                 for j in xrange(xmax - xmin + 1)] \
                 for i in xrange(ymax - ymin + 1)]
   
@@ -876,7 +907,7 @@ def get_clear_image_w_text(matrix, boundary, white_space, idx=''):
     test_image1 = [[matrix[i][j] \
                   for j in xrange(xmin, xmax + 1)] \
                   for i in xrange(ymin, ymax + 1)]
-    test_image2 = [[100 if white_space[i][j] else matrix[i][j] 
+    test_image2 = [[100 if visited_white_pix[i][j] else matrix[i][j] 
                   for j in xrange(xmin, xmax + 1)] \
                   for i in xrange(ymin, ymax + 1)]
     bord = [[0 if background_pixels[i][j] else matrix[i][j] \
@@ -891,26 +922,25 @@ def get_clear_image_w_text(matrix, boundary, white_space, idx=''):
 
   
 '''
-Tightens the bubble by finding boundaries of where the black pixels are and
-adding a bit of margin.
+Tightens the bubble by cropping out the space in the border that do not contain
+black pixels (necessary for a valid character).
 
-Returns the tightened bubble as well as the number of black pixles and the
+Returns the tightened bubble as well as the number of black pixels and the
 x and y offset of the tightened bubble in the original image.
 
 '''
-# TODO: start from the boundary of bubble instead of the entire image
-# also, see if this function really helps gain any performance
-def tighten_bubble_boundary(matrix, idx):
+# TODO: see if this function really helps gain any performance
+def tighten_bubble_boundary(bubble_matrix, idx):
   print "Cropping extra white space..."
-  xmin = len(matrix[0])
+  xmin = len(bubble_matrix[0])
   xmax = -1
-  ymin = len(matrix)
+  ymin = len(bubble_matrix)
   ymax = -1
   black_pix_count = 0
   
-  for i in xrange(len(matrix)):
-    for j in xrange(len(matrix[0])):
-      if is_black_pixel(matrix[i][j]):
+  for i in xrange(len(bubble_matrix)):
+    for j in xrange(len(bubble_matrix[0])):
+      if is_black_pixel(bubble_matrix[i][j]):
         black_pix_count += 1
         if i < ymin:
           ymin = i
@@ -922,51 +952,67 @@ def tighten_bubble_boundary(matrix, idx):
           xmax = j
   
   xmin = xmin - BUBBLE_MARGIN if xmin >= BUBBLE_MARGIN else 0
-  xmax = xmax + BUBBLE_MARGIN if xmax < len(matrix[0]) - BUBBLE_MARGIN else 0
+  xmax = xmax + BUBBLE_MARGIN if xmax < len(bubble_matrix[0]) - BUBBLE_MARGIN \
+      else 0
   ymin = ymin - BUBBLE_MARGIN if ymin >= BUBBLE_MARGIN else 0
-  ymax = ymax + BUBBLE_MARGIN if ymax < len(matrix) - BUBBLE_MARGIN else 0
+  ymax = ymax + BUBBLE_MARGIN if ymax < len(bubble_matrix) - BUBBLE_MARGIN \
+      else 0
   
   if DBG:
     box = [list(x) for x in matrix]
-    for i in xrange(len(matrix)):
+    for i in xrange(len(bubble_matrix)):
       box[i][xmin] = 0
       box[i][xmax] = 0
-    for i in xrange(len(matrix[0])):
+    for i in xrange(len(bubble_matrix[0])):
       box[ymin][i] = 0
       box[ymax][i] = 0
     print_image(box, 'box_lines' + idx)
   
-  tightened_bubble = [[matrix[i][j] for j in xrange(xmin, xmax + 1)] \
-                      for i in xrange(ymin, ymax + 1)]
+  tightened_bubble = [[bubble_matrix[i][j] for j in xrange(xmin, xmax + 1)] \
+                                           for i in xrange(ymin, ymax + 1)]
+                      
   return tightened_bubble, black_pix_count, (ymin, xmin)
   
   
+'''
+Gets all the background pixels that are not part of the bubble.
+
+'''
 def get_background_pixels(visited_white_pix, boundary, matrix):
   ymin, ymax, xmin, xmax = boundary
   yhi = ymax - ymin
   xhi = xmax - xmin
   
-  is_border = [[False] * (xhi + 1) for x in xrange(yhi + 1)]
-  # do flood fill from the boundaries
+  is_background = [[False] * (xhi + 1) for x in xrange(yhi + 1)]
+  # run flood fill from the boundaries
   for i in xrange(xhi + 1):
-    if not is_border[0][i] and not visited_white_pix[0][i]:
-      flood_fill_backgroud(visited_white_pix, is_border, boundary, 0, i)
-    if not is_border[yhi][i] and not visited_white_pix[yhi][i]:
-      flood_fill_backgroud(visited_white_pix, is_border, boundary, yhi, i)
+    if not is_background[0][i] and not visited_white_pix[0][i]:
+      flood_fill_backgroud(visited_white_pix, is_background, boundary, 0, i)
+    if not is_background[yhi][i] and not visited_white_pix[yhi][i]:
+      flood_fill_backgroud(visited_white_pix, is_background, boundary, yhi, i)
       
   for i in xrange(yhi + 1):
-    if not is_border[i][0] and not visited_white_pix[i][0]:
-      flood_fill_backgroud(visited_white_pix, is_border, boundary, i, 0)
-    if not is_border[i][xhi] and not visited_white_pix[i][xhi]:
-      flood_fill_backgroud(visited_white_pix, is_border, boundary, i, xhi) 
+    if not is_background[i][0] and not visited_white_pix[i][0]:
+      flood_fill_backgroud(visited_white_pix, is_background, boundary, i, 0)
+    if not is_background[i][xhi] and not visited_white_pix[i][xhi]:
+      flood_fill_backgroud(visited_white_pix, is_background, boundary, i, xhi) 
 
-  return is_border
+  return is_background
 
   
-def flood_fill_backgroud(visited_white_pix, is_border, boundary, ycoord, xcoord):
+'''
+Runs flood fill to get all pixels that are the background of the bubble.
+
+Note that this is considered to be a part of the program that eats up a lot of
+the processing time, therefore all operations within the loop need to be
+as performant as possible. Hence for less cleaner code.
+
+'''
+def flood_fill_backgroud(
+    visited_white_pix, is_background, boundary, ycoord, xcoord):
   ymin, ymax, xmin, xmax = boundary
   stack = [(ycoord, xcoord)]
-  is_border[ycoord][xcoord] = True
+  is_background[ycoord][xcoord] = True
   
   ylimit = ymax - ymin
   xlimit = xmax - xmin
@@ -978,34 +1024,37 @@ def flood_fill_backgroud(visited_white_pix, is_border, boundary, ycoord, xcoord)
     xlo = x - 1
     xhi = x + 1
     
-    if ylo >= 0 and not visited_white_pix[ylo][x] and not is_border[ylo][x]:
+    if ylo >= 0 and not visited_white_pix[ylo][x] and not is_background[ylo][x]:
       stack.append((ylo, x))
-      is_border[ylo][x] = True
+      is_background[ylo][x] = True
         
-    if yhi <= ylimit and not visited_white_pix[yhi][x] and not is_border[yhi][x]:
+    if yhi <= ylimit and not visited_white_pix[yhi][x] \
+                     and not is_background[yhi][x]:
       stack.append((yhi, x))
-      is_border[yhi][x] = True
+      is_background[yhi][x] = True
         
-    if xlo >= 0 and not visited_white_pix[y][xlo] and not is_border[y][xlo]:
+    if xlo >= 0 and not visited_white_pix[y][xlo] and not is_background[y][xlo]:
       stack.append((y, xlo))
-      is_border[y][xlo] = True
+      is_background[y][xlo] = True
         
-    if xhi <= xlimit and not visited_white_pix[y][xhi] and not is_border[y][xhi]:
+    if xhi <= xlimit and not visited_white_pix[y][xhi] \
+                     and not is_background[y][xhi]:
       stack.append((y, xhi))
-      is_border[y][xhi] = True
+      is_background[y][xhi] = True
     
     
 '''
-Runs flood fill on image for white pixels.
+Gets the white pixel count, the boundaries of the bubble, as well as mark the
+white pixels in the 2d list visited_white_pix.
 
-Modifies visited_white_pix so we don't visit the same pixel twice.
-Modifies boundary so we can determine the boundaries of the bubble.
+This is done by using flood fill, note that this part also needs to be 
+performant, and therefore might have less cleaner code.
 
 '''
-def get_bubble_parameters(matrix, ycoord, xcoord, visited):
+def get_bubble_parameters(matrix, ycoord, xcoord, visited_white_pix):
   ymin, ymax, xmin, xmax = ycoord, ycoord, xcoord, xcoord
   stack = [(ycoord, xcoord)]
-  visited[ycoord][xcoord] = True
+  visited_white_pix[ycoord][xcoord] = True
   white_pix_count = 1
   
   while stack:
@@ -1024,71 +1073,106 @@ def get_bubble_parameters(matrix, ycoord, xcoord, visited):
     xlo = x - 1
     xhi = x + 1
     
-    if ylo >= 0 and is_white_pixel(matrix[ylo][x]) and not visited[ylo][x]:
+    if ylo >= 0 and is_white_pixel(matrix[ylo][x]) \
+                and not visited_white_pix[ylo][x]:
       stack.append((ylo, x))
-      visited[ylo][x] = True
+      visited_white_pix[ylo][x] = True
       white_pix_count += 1
       
-    if yhi < len(matrix) and is_white_pixel(matrix[yhi][x]) and not visited[yhi][x]:
+    if yhi < len(matrix) and is_white_pixel(matrix[yhi][x]) \
+                         and not visited_white_pix[yhi][x]:
       stack.append((yhi, x))
-      visited[yhi][x] = True
+      visited_white_pix[yhi][x] = True
       white_pix_count += 1
       
-    if xlo >= 0 and is_white_pixel(matrix[y][xlo]) and not visited[y][xlo]:
+    if xlo >= 0 and is_white_pixel(matrix[y][xlo]) \
+                and not visited_white_pix[y][xlo]:
       stack.append((y, xlo))
-      visited[y][xlo] = True
+      visited_white_pix[y][xlo] = True
       white_pix_count += 1
       
-    if xhi < len(matrix[0]) and is_white_pixel(matrix[y][xhi]) and not visited[y][xhi]:
+    if xhi < len(matrix[0]) and is_white_pixel(matrix[y][xhi]) \
+                            and not visited_white_pix[y][xhi]:
       stack.append((y, xhi))
-      visited[y][xhi] = True
+      visited_white_pix[y][xhi] = True
       white_pix_count += 1
         
   return white_pix_count, (ymin, ymax, xmin, xmax)
 
         
 '''
-Checks if the given corrdinate is in bounds
+Checks if the given corrdinate is in bounds.
+For performance reasons, not used when doing flood fill since this requiring
+4 checks instead of 1.
 
 '''
-
-# for performance reasons, don't use this if doing flood fill
 def is_in_bounds(coord, limits):
   i, j = coord
   ymin, ymax, xmin, xmax = limits
   return i >= ymin and i <= ymax and j >= xmin and j <= xmax
   
   
+'''
+Util method for determining if a pixel is black.
+
+'''
 def is_black_pixel(val):
   return val <= BLACK_COLOR and val >= 0
 
 
+'''
+Util method for determining if a pixel is white.
+
+'''
 def is_white_pixel(val):
   return val >= WHITE_COLOR
   
 
+'''
+Util method for determining if a pixel is part of the marked gap.
+
+'''
 def is_gap(val):
   return val == -1
 
   
+'''
+Util method for determining if the number of white pixels is enough to be a 
+bubble.
+
+'''
 def is_enough_white_pix_for_bubble(white_pixel_count):
   return white_pixel_count > MIN_WHITE_PIX
 
 
+'''
+Util method for determining if the number of black pixels is enough to be a 
+block containing a character.
+
+'''
 def is_enough_black_pix_for_block(black_pixel_count):
   return black_pixel_count > MIN_BLACK_PIX
   
   
+'''
+Util method for determining if a block should be further dissected.
+
+'''
 def should_further_dissect_block(ratio):
   return ratio <= DISSECT_RATIO_THRES
   
-  
+
+'''
+Util method for determining if a block should be tried for merging with other
+blocks.
+
+'''  
 def should_try_merging(ratio):
   return ratio < RATIO_THRES
   
   
 '''
-Prints processed image matrix to image.
+Saves processed image matrix to image.
 
 '''
 def print_image(matrix, fname):
@@ -1097,16 +1181,19 @@ def print_image(matrix, fname):
   grn = (0, 255, 0)
   red = (255, 0, 0)
   
-  pixels2 = [grn if x == GREEN_MARK else red if x == RED_MARK else (x, x, x) 
+  pixels = [grn if x == GREEN_MARK else red if x == RED_MARK else (x, x, x) 
               for row in matrix for x in row]
   
   im2 = Image.new("RGB", (len(matrix[0]), len(matrix)))
-  im2.putdata(pixels2)
+  im2.putdata(pixels)
   im2.save(fname + '.png', "PNG")
   
   
 '''
 MAIN
+
+Calls either search_for_bubble_near_given_coord()  or get_all_blocks_in_image()
+depending on the arguments.
 
 '''
 def main():
