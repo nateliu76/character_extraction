@@ -2,6 +2,7 @@ import sys, os
 import Queue
 import time
 from PIL import Image
+from collections import deque
 
 '''
 Constants
@@ -196,7 +197,7 @@ Returns the subbubble given a coordinate of the subbubble.
 
 '''
 def get_subbubble(bubble_matrix_w_gaps, ycoord, xcoord, visited):
-  stack = [(ycoord, xcoord)]
+  stack = deque([(ycoord, xcoord)])
   ymin, ymax, xmin, xmax = ycoord, ycoord, xcoord, xcoord
   ylimit = len(bubble_matrix_w_gaps)
   xlimit = len(bubble_matrix_w_gaps[0])
@@ -733,7 +734,6 @@ Note that at each step, offsets need to be added, this is because:
 def get_all_blocks_in_image(matrix):
   start_time = time.time()
   
-  # TODO: change this to use indices
   visited_white_pix = [[0] * len(matrix[0]) for x in xrange(len(matrix))]
   bubble_count = 0
   bubble_matrices_w_offsets = []
@@ -1049,7 +1049,7 @@ as performant as possible. Hence for less cleaner code.
 def flood_fill_backgroud(
     visited_white_pix, is_background, boundary, ycoord, xcoord):
   ymin, ymax, xmin, xmax = boundary
-  stack = [(ycoord, xcoord)]
+  stack = deque([(ycoord, xcoord)])
   is_background[ycoord][xcoord] = True
   
   ylimit = ymax - ymin
@@ -1092,7 +1092,7 @@ performant, and therefore might have less cleaner code.
 def get_bubble_parameters(
     matrix, ycoord, xcoord, visited_white_pix, search_idx):
   ymin, ymax, xmin, xmax = ycoord, ycoord, xcoord, xcoord
-  stack = [(ycoord, xcoord)]
+  stack = deque([(ycoord, xcoord)])
   visited_white_pix[ycoord][xcoord] = search_idx
   white_pix_count = 1
   
@@ -1229,10 +1229,21 @@ def print_image(matrix, fname):
   im2.save(fname + '.png', "PNG")
   
   
+def get_pixels_vals_from_image(im):
+  # convert to gray scale
+  im = im.convert("L")
+  
+  pixels = list(im.getdata())
+  width, height = im.size
+  
+  # convert to list to 2D list
+  return [pixels[i * width:(i + 1) * width] for i in xrange(height)]
+
+  
 '''
 MAIN
 
-Calls either search_for_bubble_near_given_coord()  or get_all_blocks_in_image()
+Calls either search_for_bubble_near_given_coord() or get_all_blocks_in_image()
 depending on the arguments.
 
 '''
@@ -1251,13 +1262,7 @@ def main():
     print "Error in file name"
     sys.exit()
   
-  # get pixel values and store to list
-  im = im.convert("L")
-  pixels = list(im.getdata())
-  width, height = im.size
-  
-  # convert to list to 2D list
-  pixels = [pixels[i * width:(i + 1) * width] for i in xrange(height)]
+  pixels = get_pixels_vals_from_image(im)
   
   if len(args) >= 3:
     DEBUG_MODE = True
