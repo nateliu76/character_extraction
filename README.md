@@ -1,6 +1,6 @@
 # character_extraction
 
-## `ExtractCharacterLocations.js` and `main.js`
+## `extractCharacterLocations.js` and `main.js`
 
 Dependencies: [Jimp](https://github.com/oliver-moran/jimp)
 
