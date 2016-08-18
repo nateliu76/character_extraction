@@ -6,11 +6,10 @@ Dependencies: [Jimp](https://github.com/oliver-moran/jimp)
 
 Installation: `npm install --save jimp`
 
-
-
 There are two methods of the API:
-1. `extractCharacterLocations.getAll`
-2. `extractCharacterLocations.getNearCoord`
+
+1. `extractCharacterLocations.getAll()`
+2. `extractCharacterLocations.getNearCoord()`
 
 Currently both are partially complete, and only `extractCharacterLocations.getNearCoord` is tested.
 
