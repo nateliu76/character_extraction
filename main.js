@@ -1,6 +1,6 @@
 const jimp = require('jimp');
 const imageUtil = require('./extract/utils/imageUtil');
-const extractCharLocations = require('./extract/extractCharacterLocations');
+const extractCharLocations = require('./extractCharacterLocations');
 
 function startProcess(coords, error, img) {
   if (error) throw error;
@@ -9,16 +9,17 @@ function startProcess(coords, error, img) {
   var width = img.bitmap.width;
   var height = img.bitmap.height;
   console.log('width: ', width);
-  console.log('height:', height, '\n');
+  console.log('height:', height);
   
   var matrix = imageUtil.imageToMatrix(img);
   
   // process image
-  if (coords) {
-    extractCharLocations.getNearCoord(matrix, coords);
-  } else {
-    extractCharLocations.getAll(matrix);
-  }
+  var blocks = 
+      coords 
+          ? extractCharLocations.getNearCoord(matrix, coords) 
+          : extractCharLocations.getAll(matrix);
+  
+  console.log('\ndone, closing...');
 }
 
 function main() {
