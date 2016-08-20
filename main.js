@@ -6,15 +6,12 @@ function startProcess(coords, error, img) {
   if (error) throw error;
   
   img.greyscale();
-  var width = img.bitmap.width;
-  var height = img.bitmap.height;
-  console.log('width: ', width);
-  console.log('height:', height);
+  console.log('width: ', img.bitmap.width);
+  console.log('height:', img.bitmap.height);
   
   var matrix = imageUtil.imageToMatrix(img);
   
-  // process image
-  var blocks = 
+  var locations = 
       coords 
           ? extractCharLocations.getNearCoord(matrix, coords) 
           : extractCharLocations.getAll(matrix);

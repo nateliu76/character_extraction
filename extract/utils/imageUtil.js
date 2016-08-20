@@ -1,9 +1,12 @@
-const jimp = require("jimp");
+const jimp = require('jimp');
+const util = require('./util');
 
 const HIGHLIGHT_GREEN = -1;
 const HIGHLIGHT_BLUE = -2;
+const HIGHLIGHT_GREY = -3;
 const GREEN_HEX = jimp.rgbaToInt(0, 255, 0, 255);
 const BLUE_HEX = jimp.rgbaToInt(0, 255, 255, 255);
+const GREY_HEX = jimp.rgbaToInt(125, 125, 125, 255);
 const MARGIN = 5;
 
 module.exports = {
@@ -12,7 +15,8 @@ module.exports = {
   debugPrintMatrix: saveImage,
   debugPrintBoundary: debugPrintBoundary,
   debugPrintBubblePix: debugPrintBubblePix,
-  debugPrintOnlyBubblePix: debugPrintOnlyBubblePix
+  debugPrintOnlyBubblePix: debugPrintOnlyBubblePix,
+  mapMatrixValToGrey: mapMatrixValToGrey
 };
 
 function saveImage(matrix, filename) {
@@ -49,7 +53,7 @@ function imageToMatrix(img) {
 
 function debugPrintBoundary(matrix, boundary, filename) {
   var arr = copyMatrix(matrix);
-  markBoundary(arr, boundary);
+  markBoundary(arr, boundary, HIGHLIGHT_GREEN);
   saveImage(arr, filename);
 }
 
@@ -106,6 +110,7 @@ function cropBubbleSection(matrix, boundary) {
   var arr = [];
   for (var i = boundary.ymin; i <= boundary.ymax; i++) {
     var row = []
+    // use slice() instead.
     for (var j = boundary.xmin; j <= boundary.xmax; j++) {
       row.push(matrix[i][j]);
     }
@@ -117,11 +122,7 @@ function cropBubbleSection(matrix, boundary) {
 function copyMatrix(matrix) {
   var arr = [];
   for (var i = 0; i < matrix.length; i++) {
-    var row = []
-    for (var j = 0; j < matrix[0].length; j++) {
-      row.push(matrix[i][j]);
-    }
-    arr.push(row);
+    arr.push(matrix[i].slice());
   }
   return arr;
 }
@@ -129,9 +130,20 @@ function copyMatrix(matrix) {
 function getHexVal(pixVal) {
   if (pixVal === HIGHLIGHT_GREEN) {
     return GREEN_HEX;
-  } else if(pixVal === HIGHLIGHT_BLUE) {
+  } else if (pixVal === HIGHLIGHT_BLUE) {
     return BLUE_HEX;
+  } else if (pixVal === HIGHLIGHT_GREY) {
+    return GREY_HEX;
   } else {
     return jimp.rgbaToInt(pixVal, pixVal, pixVal, 255);
   }
+}
+
+function mapMatrixValToGrey(matrix, val) {
+  var arr = [];
+  for (var k = 0; k < matrix.length; k++) {
+    arr.push(matrix[k].map(
+        function(pix) { return util.isGap(pix) ? HIGHLIGHT_GREY : pix; }));
+  }
+  return arr;
 }

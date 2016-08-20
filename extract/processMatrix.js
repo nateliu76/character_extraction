@@ -1,8 +1,9 @@
-const util = require('./utils/util');
-const obj = require('./obj');
 const constants = require('./utils/constants');
-const queue =  require('./utils/Queue');
 const imageUtil = require('./utils/imageUtil');
+const obj = require('./obj');
+const queue =  require('./utils/Queue');
+const util = require('./utils/util');
+
 var isDebugMode = false;
 
 module.exports = {
@@ -15,7 +16,7 @@ function getBubbles(matrix) {
   
   var bubbles = [];
   var bubbleIdx = 0;
-  var visitedWhitePix = initNewArrayWithZeroes(matrix);
+  var visitedWhitePix = util.initNewArrayWithVal(matrix, 0);
   
   for (var i = 0; i < matrix.length; i++) {
     for (var j = 0; j < matrix[0].length; j++) {
@@ -25,13 +26,14 @@ function getBubbles(matrix) {
             getBubbleParams(matrix, i, j, visitedWhitePix, bubbleIdx);
         var boundary = bubbleWhitePixParams.boundary;
         
-        if (isEnoughWhitePixForBubble(bubbleWhitePixParams.whitePixCount)) {
+        if (util.hasEnoughWhitePixForBlock(
+            bubbleWhitePixParams.whitePixCount)) {
           var isWhitePixOfBubble = 
               getIsWhitePixOfBubble(boundary, visitedWhitePix, bubbleIdx);
           var bubbleTextParams = 
               getBubbleText(matrix, boundary, isWhitePixOfBubble);
               
-          if (hasEnoughBlackPixForBubble(bubbleTextParams.blackPixCount)) {
+          if (util.hasEnoughBlackPixForBlock(bubbleTextParams.blackPixCount)) {
             var yoffset = bubbleTextParams.yoffset + boundary.ymin;
             var xoffset = bubbleTextParams.xoffset + boundary.xmin;
             bubbles.push(
@@ -53,7 +55,7 @@ function getBubbleEnclosingCoord(matrix, coords) {
   // is formatted in ms paint
   var xcoord = parseInt(coords[0]);
   var ycoord = parseInt(coords[1]);
-  var visitedWhitePix = initNewArrayWithZeroes(matrix);
+  var visitedWhitePix = util.initNewArrayWithVal(matrix, 0);
   
   var bubbleParams = 
       getBubbleParamsEnclosingCoords(matrix, ycoord, xcoord, visitedWhitePix);
@@ -78,7 +80,7 @@ function getBubbleEnclosingCoord(matrix, coords) {
           bubbleTextParams.bubbleMatrix, '2_clean_bubble.png');
     }
     
-    if (hasEnoughBlackPixForBubble(bubbleTextParams.blackPixCount)) {
+    if (util.hasEnoughBlackPixForBlock(bubbleTextParams.blackPixCount)) {
       console.log('\nBubble found around given coordinates!');
       return new obj.Bubble(bubbleTextParams.bubbleMatrix, yoffset, xoffset);
     } else {
@@ -115,7 +117,7 @@ function getBubbleParamsEnclosingCoords(
           getBubbleParams(matrix, y, x, visitedWhitePix, bubbleIdx);
       var boundary = bubbleWhitePixParams.boundary;
       
-      if (isEnoughWhitePixForBubble(bubbleWhitePixParams.whitePixCount)) {
+      if (util.hasEnoughWhitePixForBlock(bubbleWhitePixParams.whitePixCount)) {
         console.log('bubble found around:', x, y);
         console.log('bubble boundary:', boundary);
         bubbleFound = true;
@@ -128,10 +130,9 @@ function getBubbleParamsEnclosingCoords(
       var j = x + xcoords[k];
       var nextPos = [i, j];
       
-      if (
-          isInBounds(ylen, xlen, i, j) 
-              && !visited.has(nextPos) 
-              && !visitedWhitePix[i][j]) {
+      if (util.isInBounds(ylen, xlen, i, j) 
+          && !visited.has(nextPos) 
+          && !visitedWhitePix[i][j]) {
         q.enqueue(nextPos);
         visited.add(nextPos);
       }
@@ -172,10 +173,9 @@ function getBubbleParams(matrix, ycoord, xcoord, visitedWhitePix, bubbleIdx) {
     for (var k = 0; k < 4; k++) {
       var i = y + ycoords[k];
       var j = x + xcoords[k];
-      if (
-          isInBounds(ylen, xlen, i, j) 
-              && util.isWhitePixel(matrix[i][j]) 
-              && !visitedWhitePix[i][j]) {
+      if (util.isInBounds(ylen, xlen, i, j) 
+          && util.isWhitePixel(matrix[i][j]) 
+          && !visitedWhitePix[i][j]) {
         stack.push([i, j]);
         visitedWhitePix[i][j] = bubbleIdx;
         whitePixCount++;
@@ -184,7 +184,7 @@ function getBubbleParams(matrix, ycoord, xcoord, visitedWhitePix, bubbleIdx) {
   }
   return {
       whitePixCount: whitePixCount, 
-      boundary: new Boundary(ymin, ymax, xmin, xmax)};
+      boundary: new obj.Boundary(ymin, ymax, xmin, xmax)};
 }
 
 function getBubbleText(matrix, boundary, isWhitePixOfBubble) {
@@ -215,11 +215,7 @@ function getBackgroundPixels(matrix, boundary, isWhitePixOfBubble) {
   
   var isBackground = [];
   for (var i = 0; i <= yhi; i++) {
-    var row = [];
-    for (var j = 0; j <= xhi; j++) {
-      row.push(false);
-    }
-    isBackground.push(row);
+    isBackground.push(new Array(xhi + 1).fill(false));
   }
   // run flood fill from the specified boundary
   for (var i = 0; i <= yhi; i++) {
@@ -261,10 +257,9 @@ function floodFillBackground(
     for (var k = 0; k < 4; k++) {
       var i = y + ycoords[k];
       var j = x + xcoords[k];
-      if (
-          isInBounds(ylen, xlen, i, j) 
-              && !isWhitePixOfBubble[i][j] 
-              && !isBackground[i][j]) {
+      if (util.isInBounds(ylen, xlen, i, j) 
+          && !isWhitePixOfBubble[i][j] 
+          && !isBackground[i][j]) {
         stack.push([i, j]);
         isBackground[i][j] = true;
       }
@@ -292,36 +287,4 @@ function tightenBubbleBoundary(bubbleMatrix, blackPixCount) {
       blackPixCount: blackPixCount,
       yoffset: 0,
       xoffset: 0};
-}
-
-function initNewArrayWithZeroes(matrix) {
-  var arr = [];
-  // TODO: use array.fill() instead? find out how to use it
-  for (var i = 0; i < matrix.length; i++) {
-    var row = []
-    for (var j = 0; j < matrix[0].length; j++) {
-      row.push(0);
-    }
-    arr.push(row);
-  }
-  return arr;
-}
-
-function isInBounds(ylen, xlen, y, x) {
-  return y >= 0 && y <= ylen && x >= 0 && x <= xlen;
-}
-
-function isEnoughWhitePixForBubble(whitePixCount) {
-  return whitePixCount > constants.BLOCK_MIN_WHITE_PIX_COUNT;
-}
-
-function hasEnoughBlackPixForBubble(blackPixCount) {
-  return blackPixCount > constants.BLOCK_MIN_BLACK_PIX_COUNT;
-}
-
-function Boundary(ymin, ymax, xmin, xmax) {
-  this.ymin = ymin;
-  this.ymax = ymax;
-  this.xmin = xmin;
-  this.xmax = xmax;
 }

@@ -4,7 +4,9 @@ const util = require('./utils/util');
 module.exports = {
   Bubble: Bubble,
   Subbubble: Subbubble,
-  Block: Block
+  Block: Block,
+  CharacterLocation: CharacterLocation,
+  Boundary: Boundary
 };
 
 function Bubble(matrix, yoffset, xoffset) {
@@ -45,4 +47,24 @@ function Block(ymin, ymax, xmin, xmax, blackPixCount) {
             && this.blockSize < constants.MAX_BLOCK_SIZE;
     return isValidSize && util.hasEnoughBlackPixForBlock(this.blackPixCount);
   }
+}
+
+function CharacterLocation(block) {
+  this.ymin = block.ymin;
+  this.ymax = block.ymax;
+  this.xmin = block.xmin;
+  this.xmax = block.xmax;
+  this.blackPixCount = blackPixCount;
+}
+
+// move to util?
+function Boundary(ymin, ymax, xmin, xmax) {
+  this.ymin = ymin;
+  this.ymax = ymax;
+  this.xmin = xmin;
+  this.xmax = xmax;
+}
+
+function blockToCharLoc(block) {
+  return new CharacterLocation(block);
 }

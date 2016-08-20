@@ -109,10 +109,10 @@ ymin and xmin are offsets of the subbubble matrix within the bubble matrix.
 
 '''      
 def get_subbubbles_from_bubble(bubble_matrix, idx=''):
-  global subbubble_print_idx
   print 'finding all subbubbles of bubble...'
   bubble_matrix_w_gaps = mark_gaps_in_matrix(bubble_matrix, idx)
-  visited = [[False] * len(bubble_matrix[0]) for x in xrange(len(bubble_matrix))]
+  visited = \
+      [[False] * len(bubble_matrix[0]) for x in xrange(len(bubble_matrix))]
   
   subbubbles = []
   for i, y in enumerate(bubble_matrix_w_gaps):
@@ -125,8 +125,9 @@ def get_subbubbles_from_bubble(bubble_matrix, idx=''):
     
   # print the boundaries of the subbubble in the image
   if DEBUG_MODE:
-    subbubble_img = [[100 if is_gap(pix) else pix for pix in row] \
-                                      for row in bubble_matrix_w_gaps]
+    subbubble_img = \
+        [[100 if is_gap(pix) else pix for pix in row] \
+            for row in bubble_matrix_w_gaps]
     subbubble_blocks = [subbubble_to_Text_block(sb) for sb in subbubbles]
     write_blocks_to_img(subbubble_img, subbubble_blocks)
     print_image(subbubble_img, 'subbubble_img' + idx)
@@ -220,6 +221,7 @@ def get_subbubble(bubble_matrix_w_gaps, ycoord, xcoord, visited):
       # as part of the subbubble if it contains black pixels.
       # consider this if the edge case happens where subbubbles within a bubble
       # are not divided properly
+      
       for i in xrange(ymincurr, ymaxcurr + 1):
         for j in xrange(xmincurr, xmaxcurr + 1):
           visited[i][j] = True

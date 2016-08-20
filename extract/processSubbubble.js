@@ -1,9 +1,9 @@
 
 module.exports = {
-  getBlocks: getBlocks
+  getCharacterLocations: getCharacterLocations
 };
 
-function getBlocks(subbubbles) {
-  console.log('getting all blocks within subbubbles...');
+function getCharacterLocations(subbubbles) {
+  console.log('getting all character locations within subbubbles...');
   console.log('not yet implemented\n');
 }

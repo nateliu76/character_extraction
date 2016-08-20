@@ -3,24 +3,20 @@ const processBubble = require('./extract/processBubble');
 const processSubbubble = require('./extract/processSubbubble');
 
 module.exports = {
-  getAll: getAllBlocksInMatrix,
-  getNearCoord: getBlocksNearCoord
+  getAll: getAll,
+  getNearCoord: getNearCoord
 };
 
-/**
- * 
- * 
- */
-function getAllBlocksInMatrix(matrix) {
+function getAll(matrix) {
   var bubbles = processMatrix.getBubbles(matrix);
   var subbubbles = processBubble.getSubbubbles(bubbles);
-  var blocks = processSubbubble.getBlocks(subbubbles);
-  return blocks;
+  var charLocations = processSubbubble.getCharacterLocations(subbubbles);
+  return charLocations;
 }
 
-function getBlocksNearCoord(matrix, coords) {
+function getNearCoord(matrix, coords) {
   var bubble = processMatrix.getBubbleEnclosingCoord(matrix, coords);
-  var subbubbles = processBubble.getSubbubbles(bubble);
-  var blocks = processSubbubble.getBlocks(subbubbles);
-  return blocks;
+  var subbubbles = processBubble.getSubbubbles([bubble]);
+  var charLocations = processSubbubble.getCharacterLocations(subbubbles);
+  return charLocations;
 }
