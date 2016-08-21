@@ -19,6 +19,8 @@ module.exports = {
   mapMatrixValToGrey: mapMatrixValToGrey
 };
 
+// Saves the matrix to an image using the filename.
+// The filename should have the filetype suffix. Ex: some_image.png
 function saveImage(matrix, filename) {
   var width = matrix[0].length;
   var height = matrix.length;
@@ -35,6 +37,8 @@ function saveImage(matrix, filename) {
   });
 }
 
+// Saves the pixel values of an image to a 2d list aka matrix.
+// The image should be in greyscale.
 function imageToMatrix(img) {
   var width = img.bitmap.width;
   var height = img.bitmap.height;
@@ -50,6 +54,22 @@ function imageToMatrix(img) {
   }
   return matrix;
 }
+
+// Converts the value of the matrix to an actual pixel value that is used by 
+// jimp.
+function getHexVal(pixVal) {
+  if (pixVal === HIGHLIGHT_GREEN) {
+    return GREEN_HEX;
+  } else if (pixVal === HIGHLIGHT_BLUE) {
+    return BLUE_HEX;
+  } else if (pixVal === HIGHLIGHT_GREY) {
+    return GREY_HEX;
+  } else {
+    return jimp.rgbaToInt(pixVal, pixVal, pixVal, 255);
+  }
+}
+
+// Below are methods used for debugging.
 
 function debugPrintBoundary(matrix, boundary, filename) {
   var arr = copyMatrix(matrix);
@@ -109,12 +129,7 @@ function markBoundary(matrix, boundary, color) {
 function cropBubbleSection(matrix, boundary) {
   var arr = [];
   for (var i = boundary.ymin; i <= boundary.ymax; i++) {
-    var row = []
-    // use slice() instead.
-    for (var j = boundary.xmin; j <= boundary.xmax; j++) {
-      row.push(matrix[i][j]);
-    }
-    arr.push(row);
+    arr.push(matrix[i].slice(boundary.xmin, boundary.xmax + 1));
   }
   return arr;
 }
@@ -125,18 +140,6 @@ function copyMatrix(matrix) {
     arr.push(matrix[i].slice());
   }
   return arr;
-}
-
-function getHexVal(pixVal) {
-  if (pixVal === HIGHLIGHT_GREEN) {
-    return GREEN_HEX;
-  } else if (pixVal === HIGHLIGHT_BLUE) {
-    return BLUE_HEX;
-  } else if (pixVal === HIGHLIGHT_GREY) {
-    return GREY_HEX;
-  } else {
-    return jimp.rgbaToInt(pixVal, pixVal, pixVal, 255);
-  }
 }
 
 function mapMatrixValToGrey(matrix, val) {

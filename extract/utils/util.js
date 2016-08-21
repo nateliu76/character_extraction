@@ -8,7 +8,8 @@ module.exports = {
   hasEnoughWhitePixForBlock: hasEnoughWhitePixForBlock,
   blockRatio: blockRatio,
   isGap: isGap,
-  isInBounds: isInBounds
+  isInBounds: isInBounds,
+  blockToCharLoc: blockToCharLoc
 };
 
 function initNewArrayWithVal(matrix, val) {
@@ -45,4 +46,8 @@ function isGap(pixVal) {
 
 function isInBounds(ylen, xlen, y, x) {
   return y >= 0 && y <= ylen && x >= 0 && x <= xlen;
+}
+
+function blockToCharLoc(block) {
+  return new obj.CharacterLocation(block);
 }

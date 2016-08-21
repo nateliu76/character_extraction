@@ -49,6 +49,7 @@ function Block(ymin, ymax, xmin, xmax, blackPixCount) {
   }
 }
 
+// A stripped down version of the Block object
 function CharacterLocation(block) {
   this.ymin = block.ymin;
   this.ymax = block.ymax;
@@ -57,14 +58,9 @@ function CharacterLocation(block) {
   this.blackPixCount = blackPixCount;
 }
 
-// move to util?
 function Boundary(ymin, ymax, xmin, xmax) {
   this.ymin = ymin;
   this.ymax = ymax;
   this.xmin = xmin;
   this.xmax = xmax;
-}
-
-function blockToCharLoc(block) {
-  return new CharacterLocation(block);
 }

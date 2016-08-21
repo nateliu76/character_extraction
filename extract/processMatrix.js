@@ -6,11 +6,31 @@ const util = require('./utils/util');
 
 var isDebugMode = false;
 
+// The comments below perhaps should be moved to perhaps a place where the 
+// algorithm is explained.
+
+// This program makes the following assumptions and use them as heuristics:
+// 1. The color of words within a text bubble is black
+// 2. The color of the text bubble is white
+// 3. The white portion of the bubble surrounds the black text
+
+// Taking the above assumptions, we can find places that are possibly bubbles
+// using the following steps:
+// 1. Run flood fill to find out how many white pixels there are, this should be
+//    above a certain threshold
+// 2. Count the number of black pixels that are surrounded by the white pixels,
+//    this should be above a certain threshold if there are words in the bubble
+
+// An extra step is taken between 1 and 2 to get rid of pixels that are not 
+// surrounded by the white pixels. After getting rid of them, we can then
+// easily count the black pixels within the bubble.
+
 module.exports = {
   getBubbles: getBubbles,
   getBubbleEnclosingCoord: getBubbleEnclosingCoord
 };
 
+// Get all possible bubbles that are in the matrix.
 function getBubbles(matrix) {
   console.log('\nGetting all bubbles within the matrix...');
   
@@ -87,10 +107,13 @@ function getBubbleEnclosingCoord(matrix, coords) {
       console.log('\nNo bubble found around given coordinates');
     }
   }
-  // return something smarter
+  // TODO: return something smarter
   return new obj.Bubble(false, yoffset, xoffset);
 }
 
+// a wrapping function around getBubbleParams() that uses BFS to find the white
+// pixels of the bubble (as opposed to iterating through every pixel as seen
+// in getBubbles()
 function getBubbleParamsEnclosingCoords(
     matrix, ycoord, xcoord, visitedWhitePix) {
   var bubbleIdx = 0;
@@ -100,7 +123,11 @@ function getBubbleParamsEnclosingCoords(
   var xcoords = constants.X_COORDS;
   var bubbleFound = false;
   
-  var visited = new Set([[ycoord, xcoord]]); // not sure if this is performant
+  // not sure if putting lists within a set is performant, might be worth it to
+  // to change this to a 2d list.
+  // visited keeps track of visited non white pixels
+  var visited = new Set([[ycoord, xcoord]]);
+  
   // run BFS around given coords
   var q = new queue.Queue();
   q.enqueue([ycoord, xcoord]);
@@ -117,6 +144,7 @@ function getBubbleParamsEnclosingCoords(
           getBubbleParams(matrix, y, x, visitedWhitePix, bubbleIdx);
       var boundary = bubbleWhitePixParams.boundary;
       
+      // if bubble is found, break from BFS
       if (util.hasEnoughWhitePixForBlock(bubbleWhitePixParams.whitePixCount)) {
         console.log('bubble found around:', x, y);
         console.log('bubble boundary:', boundary);
@@ -124,7 +152,7 @@ function getBubbleParamsEnclosingCoords(
         break;
       }
     }
-    // check the 4 nearby pixels
+    // check the 4 nearby pixels and put on queue if necessary
     for (var k = 0; k < 4; k++) {
       var i = y + ycoords[k];
       var j = x + xcoords[k];
@@ -132,7 +160,7 @@ function getBubbleParamsEnclosingCoords(
       
       if (util.isInBounds(ylen, xlen, i, j) 
           && !visited.has(nextPos) 
-          && !visitedWhitePix[i][j]) {
+              && !visitedWhitePix[i][j]) {
         q.enqueue(nextPos);
         visited.add(nextPos);
       }
@@ -175,7 +203,7 @@ function getBubbleParams(matrix, ycoord, xcoord, visitedWhitePix, bubbleIdx) {
       var j = x + xcoords[k];
       if (util.isInBounds(ylen, xlen, i, j) 
           && util.isWhitePixel(matrix[i][j]) 
-          && !visitedWhitePix[i][j]) {
+              && !visitedWhitePix[i][j]) {
         stack.push([i, j]);
         visitedWhitePix[i][j] = bubbleIdx;
         whitePixCount++;
@@ -187,6 +215,7 @@ function getBubbleParams(matrix, ycoord, xcoord, visitedWhitePix, bubbleIdx) {
       boundary: new obj.Boundary(ymin, ymax, xmin, xmax)};
 }
 
+// Get bubble with only the text portion of the bubble
 function getBubbleText(matrix, boundary, isWhitePixOfBubble) {
   var isBackground = getBackgroundPixels(matrix, boundary, isWhitePixOfBubble);
   
@@ -197,11 +226,13 @@ function getBubbleText(matrix, boundary, isWhitePixOfBubble) {
   for (var i = ymin; i <= boundary.ymax; i++) {
     var row = [];
     for (var j = xmin; j <= boundary.xmax; j++) {
-      var isBackgroundPix = isBackground[i - ymin][j - xmin]
-      if (util.isBlackPixel(matrix[i][j]) && !isBackgroundPix) {
+      var isPixBackground = isBackground[i - ymin][j - xmin]
+      // once tightenBubbleBoundary() is implemented, move black pixel counting
+      // there
+      if (util.isBlackPixel(matrix[i][j]) && !isPixBackground) {
         blackPixCount++;
       }
-      var pixVal = isBackgroundPix ? 255 : matrix[i][j];
+      var pixVal = isPixBackground ? constants.WHITE_COLOR : matrix[i][j];
       row.push(pixVal);
     }
     bubbleMatrix.push(row);
@@ -209,6 +240,9 @@ function getBubbleText(matrix, boundary, isWhitePixOfBubble) {
   return tightenBubbleBoundary(bubbleMatrix, blackPixCount)
 }
 
+// Runs flood fill on the boundaries to determine the pixels that are part of 
+// the "background". The background is defined to be part of the bubble that is
+// surrounds the white pixels of the bubble.
 function getBackgroundPixels(matrix, boundary, isWhitePixOfBubble) {
   var yhi = boundary.ymax - boundary.ymin;
   var xhi = boundary.xmax - boundary.xmin;

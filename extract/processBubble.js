@@ -4,6 +4,36 @@ const obj = require('./obj');
 const util = require('./utils/util');
 var isDebugMode = false;
 
+// This class is used to deal with the case where we have multiple bubbles that
+// are merged. This separates the bubbles into separate sub-bubbles for ease of
+// processing. 
+
+// In perhaps half the cases, it is possible that a bubble has only
+// a single subbbubble.
+
+// Might be worth it to use some quick heuristic to bypass this stage if there
+// is only a single subbubble within the bubble.
+
+// Gaps between words are marked in the cleaned up bubble that only contains 
+// text. the Gap is defined to be places in the matrix where there are no 
+// black pixels in that row and column.
+
+// The assumptions used:
+// 1. Subbubbles have a certain distance between each other
+// 2. The words within a subbubble are close to each other
+// 3. the region in which separates subbubbles will be marked as a gap (using 
+//    the definition of what a gap is above)
+// 4. Each region that is not part of a gap has the shape of a rectangle
+// 5. Words can only appear within rectangles
+
+// Using those assumptions, we find the subbubbles with the following method
+// 1. Mark the gaps of the matrix to find which pixels have no words in that
+//    row and column
+// 2. Find rectangles, once a rectangle is found, find if it has any other 
+//    rectangles nearby within a certain distance.
+// 3. All clusters of rectangles are considered to be a subbubble if there are
+//    words within them, and returned.
+
 module.exports = {
   getSubbubbles: getSubbubbles
 };
@@ -37,22 +67,16 @@ function getSubbubblesFromBubble(bubble, idx) {
   var visited = util.initNewArrayWithVal(matrix, false);
   
   var subbubbles = [];
-  // iterate through each pixel and find subbubble
+  // iterate through each pixel to find subbubble
   for (var i = 0; i < matrix.length; i++) {
     for (var j = 0; j < matrix[0].length; j++) {
       if (!util.isGap(markedMatrix[i][j]) && !visited[i][j]) {
         var subbubbleParams = getSubbubbleParams(markedMatrix, i, j, visited);
         if (subbubbleParams.hasSubbubble) {
           console.log('\nfound subbubble');
-              
-          var subbubble = 
-              new obj.Subbubble(
-                  subbubbleParams.subbubbleMatrix, 
-                      yoffset + subbubbleParams.yoffset, 
-                      xoffset + subbubbleParams.xoffset);
           
-          // debug print subbubble here
-          if (isDebugMode && subbubbles.length < 10) {
+          // debug print subbubble on top of marked matrix
+          if (isDebugMode) {
             var filename = 
                 '4_' + idx + '_' + subbubbles.length + '_subbubble.png';
             var ymin = subbubbleParams.yoffset;
@@ -65,6 +89,11 @@ function getSubbubblesFromBubble(bubble, idx) {
             imageUtil.debugPrintBoundary(arr, boundary, filename);
           }
           
+          var subbubble = 
+              new obj.Subbubble(
+                  subbubbleParams.subbubbleMatrix, 
+                      yoffset + subbubbleParams.yoffset, 
+                      xoffset + subbubbleParams.xoffset);
           subbubbles.push(subbubble);
         }
       }
@@ -73,6 +102,7 @@ function getSubbubblesFromBubble(bubble, idx) {
   return subbubbles;
 }
 
+// Mark gaps for the matrix
 function getMatrixWithMarkedGaps(matrix) {
   var matrixCopy = [];
   for (var i = 0; i < matrix.length; i++) {
@@ -121,7 +151,7 @@ function getSubbubbleParams(markedMatrix, ycoord, xcoord, visited) {
   var xmax = xcoord;
   var blackPixCount = 0;
   
-  // DFS, but search for rectangles nearby instead of pixels nearby
+  // DFS, but search in units of rectangles instead of pixels
   while (stack.length > 0) {
     var coord = stack.pop();
     var y = coord[0];
@@ -134,6 +164,7 @@ function getSubbubbleParams(markedMatrix, ycoord, xcoord, visited) {
       var xmincurr = boundary.xmin;
       var xmaxcurr = boundary.xmax;
       
+      // update subbubble's y/x min/max
       ymin = Math.min(ymin, ymincurr);
       ymax = Math.max(ymax, ymaxcurr);
       xmin = Math.min(xmin, xmincurr);
@@ -149,11 +180,18 @@ function getSubbubbleParams(markedMatrix, ycoord, xcoord, visited) {
         }
       }
       
+      // search nearby coordinates for rectangles close by
+      // add them to the stack if found
       pushNearbyRectsToStack(
           markedMatrix, ymincurr, ymaxcurr, xmincurr, xmaxcurr, stack);
     }
   }
+  
+  // check if the current subbubble has enough black pixels. If so, copy the 
+  // subbubble's portion of the matrix (without gaps marked) and return it
+  // along with other parameters
   if (util.hasEnoughBlackPixForBlock(blackPixCount)) {
+    // note: might want to add some extra buffer for the boundary
     var subbubbleMatrix = [];
     for (var i = ymin; i <= ymax; i++) {
       var row = [];
@@ -164,7 +202,6 @@ function getSubbubbleParams(markedMatrix, ycoord, xcoord, visited) {
       }
       subbubbleMatrix.push(row);
     }
-    
     return {
         hasSubbubble: true, 
         subbubbleMatrix: subbubbleMatrix, 
@@ -175,7 +212,7 @@ function getSubbubbleParams(markedMatrix, ycoord, xcoord, visited) {
   }
 }
 
-// modifies stack
+// modifies stack by adding coordinates of nearby rectangles
 function pushNearbyRectsToStack(
     markedMatrix, ymincurr, ymaxcurr, xmincurr, xmaxcurr, stack) {
   var ylimit = markedMatrix.length - 1;
@@ -236,6 +273,8 @@ function pushNearbyRectsToStack(
   }
 }
 
+// A rectangle is defined to be an area that is enclosed by gaps, the shape is
+// of a rectangle.
 function getRectBoundary(markedMatrix, ycoord, xcoord) {
   var ylimit = markedMatrix.length - 1;
   var xlimit = markedMatrix[0].length - 1;
