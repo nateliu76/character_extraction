@@ -9,7 +9,9 @@ module.exports = {
   blockRatio: blockRatio,
   isGap: isGap,
   isInBounds: isInBounds,
-  blockToCharLoc: blockToCharLoc
+  getMatrixWithMarkedGaps: getMatrixWithMarkedGaps,
+  shouldDissectBlock: shouldDissectBlock,
+  hasEnoughLenToDissect: hasEnoughLenToDissect
 };
 
 function initNewArrayWithVal(matrix, val) {
@@ -48,6 +50,52 @@ function isInBounds(ylen, xlen, y, x) {
   return y >= 0 && y <= ylen && x >= 0 && x <= xlen;
 }
 
-function blockToCharLoc(block) {
-  return new obj.CharacterLocation(block);
+// Mark gaps for the matrix
+function getMatrixWithMarkedGaps(matrix) {
+  // initialize hasWord arrays for y, x dir
+  var hasWordY = [];
+  var hasWordX = [];
+  for (var i = 0; i < matrix.length; i++) {
+    hasWordY.push(false);
+  }
+  for (var j = 0; j < matrix[0].length; j++) {
+    hasWordX.push(false);
+  }
+  
+  // iterate through every pixel in matrix and mark hasWord
+  for (var i = 0; i < matrix.length; i++) {
+    for (var j = 0; j < matrix[0].length; j++) {
+      if (isBlackPixel(matrix[i][j])) {
+        hasWordY[i] = true;
+        hasWordX[j] = true;
+      }
+    }
+  }
+  // actually we don't really need the matrix to be marked, we can just use the
+  // two hasWord arrays to see if it is marked, however this optimize might
+  // not be significant.
+  
+  // mark copy of matrix based off value of hasWord
+  var matrixCopy = [];
+  for (var i = 0; i < matrix.length; i++) {
+    matrixCopy.push(matrix[i].slice());
+  }
+  for (var i = 0; i < matrix.length; i++) {
+    for (var j = 0; j < matrix[0].length; j++) {
+      if (!hasWordY[i] || !hasWordX[j]) {
+        matrixCopy[i][j] = constants.GAP_VAL;
+      }
+    }
+  }
+  return matrixCopy
+}
+
+function shouldDissectBlock(block) {
+  return block.ratio <= constants.DISSECT_RATIO_THRES 
+      && (hasEnoughLenToDissect(block.ylen) 
+          || hasEnoughLenToDissect(block.xlen));
+}
+
+function hasEnoughLenToDissect(len) {
+  return len > constants.WORD_BREAK_MIN_LEN;
 }

@@ -2,6 +2,7 @@ const constants = require('./utils/constants');
 const imageUtil = require('./utils/imageUtil');
 const obj = require('./obj');
 const util = require('./utils/util');
+
 var isDebugMode = false;
 
 // This class is used to deal with the case where we have multiple bubbles that
@@ -47,7 +48,7 @@ function getSubbubbles(bubbles) {
   var subbubbles = []
   for (var i = 0; i < bubbles.length; i++) {
     var subbbubblesFromCurrBubble = getSubbubblesFromBubble(bubbles[i], i);
-    subbubbles = subbubbles.concat(subbbubblesFromCurrBubble);
+    Array.prototype.push.apply(subbubbles, subbbubblesFromCurrBubble);
   }
   return subbubbles;
 }
@@ -57,7 +58,7 @@ function getSubbubblesFromBubble(bubble, idx) {
   var yoffset = bubble.yoffset;
   var xoffset = bubble.xoffset;
   
-  var markedMatrix = getMatrixWithMarkedGaps(matrix);
+  var markedMatrix = util.getMatrixWithMarkedGaps(matrix);
   
   if (isDebugMode) {
     var arr = imageUtil.mapMatrixValToGrey(markedMatrix, constants.GAP_VAL);
@@ -100,47 +101,6 @@ function getSubbubblesFromBubble(bubble, idx) {
     }
   }
   return subbubbles;
-}
-
-// Mark gaps for the matrix
-function getMatrixWithMarkedGaps(matrix) {
-  var matrixCopy = [];
-  for (var i = 0; i < matrix.length; i++) {
-    matrixCopy.push(matrix[i].slice());
-  }
-  
-  // initialize hasWord arrays for y, x dir
-  var hasWordY = [];
-  var hasWordX = [];
-  for (var i = 0; i < matrix.length; i++) {
-    hasWordY.push(false);
-  }
-  for (var j = 0; j < matrix[0].length; j++) {
-    hasWordX.push(false);
-  }
-  
-  // iterate through every pixel in matrix and mark hasWord
-  for (var i = 0; i < matrix.length; i++) {
-    for (var j = 0; j < matrix[0].length; j++) {
-      if (util.isBlackPixel(matrix[i][j])) {
-        hasWordY[i] = true;
-        hasWordX[j] = true;
-      }
-    }
-  }
-  // actually we don't really need the matrix to be marked, we can just use the
-  // two hasWord arrays to see if it is marked, however this optimize might
-  // not be significant.
-  
-  // mark copy of matrix based off value of hasWord
-  for (var i = 0; i < matrix.length; i++) {
-    for (var j = 0; j < matrix[0].length; j++) {
-      if (!hasWordY[i] || !hasWordX[j]) {
-        matrixCopy[i][j] = constants.GAP_VAL;
-      }
-    }
-  }
-  return matrixCopy
 }
 
 function getSubbubbleParams(markedMatrix, ycoord, xcoord, visited) {

@@ -29,7 +29,7 @@ function Block(ymin, ymax, xmin, xmax, blackPixCount) {
   
   this.ylen = ymax - ymin + 1;
   this.xlen = xmax - xmin + 1;
-  this.ratio = util.blockRatio(ylen, xlen);
+  this.ratio = util.blockRatio(this.ylen, this.xlen);
   this.blockSize = this.ylen * this.xlen;
   
   this.yoffset = 0;
@@ -47,14 +47,18 @@ function Block(ymin, ymax, xmin, xmax, blackPixCount) {
             && this.blockSize < constants.MAX_BLOCK_SIZE;
     return isValidSize && util.hasEnoughBlackPixForBlock(this.blackPixCount);
   }
+  
+  this.hasBlackPix = function() {
+    return this.blackPixCount > 0;
+  }
 }
 
 // A stripped down version of the Block object
 function CharacterLocation(block) {
-  this.ymin = block.ymin;
-  this.ymax = block.ymax;
-  this.xmin = block.xmin;
-  this.xmax = block.xmax;
+  this.ymin = block.ymin + block.yoffset;
+  this.ymax = block.ymax + block.yoffset;
+  this.xmin = block.xmin + block.xoffset;
+  this.xmax = block.xmax + block.xoffset;
   this.blackPixCount = blackPixCount;
 }
 

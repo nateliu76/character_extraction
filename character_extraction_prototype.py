@@ -611,6 +611,12 @@ def get_block_parameters(
     matrix, ycoord, xcoord, processed, yoffset=0, xoffset=0):
   blk_pix_cnt = 0
   
+  '''
+  Note: 
+  i think there might be a bug here, the block boundary will stop once
+  there is a gap on y axis even if it is only 1 pixel deep, this is because
+  the x axis pointer will determine that it has reached the boundary.
+  '''
   i = ycoord
   while y_not_reached_boundary(matrix, i, xcoord):
     j = xcoord

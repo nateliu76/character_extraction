@@ -7,7 +7,7 @@ const HIGHLIGHT_GREY = -3;
 const GREEN_HEX = jimp.rgbaToInt(0, 255, 0, 255);
 const BLUE_HEX = jimp.rgbaToInt(0, 255, 255, 255);
 const GREY_HEX = jimp.rgbaToInt(125, 125, 125, 255);
-const MARGIN = 5;
+const MARGIN = 2;
 
 module.exports = {
   saveImage: saveImage,
@@ -16,7 +16,8 @@ module.exports = {
   debugPrintBoundary: debugPrintBoundary,
   debugPrintBubblePix: debugPrintBubblePix,
   debugPrintOnlyBubblePix: debugPrintOnlyBubblePix,
-  mapMatrixValToGrey: mapMatrixValToGrey
+  mapMatrixValToGrey: mapMatrixValToGrey,
+  debugPrintBoundaries: debugPrintBoundaries
 };
 
 // Saves the matrix to an image using the filename.
@@ -72,8 +73,14 @@ function getHexVal(pixVal) {
 // Below are methods used for debugging.
 
 function debugPrintBoundary(matrix, boundary, filename) {
+  debugPrintBoundaries(matrix, [boundary], filename);
+}
+
+function debugPrintBoundaries(matrix, boundaries, filename) {
   var arr = copyMatrix(matrix);
-  markBoundary(arr, boundary, HIGHLIGHT_GREEN);
+  for (var i = 0; i < boundaries.length; i++) {
+    markBoundary(arr, boundaries[i], HIGHLIGHT_GREEN);
+  }
   saveImage(arr, filename);
 }
 
