@@ -14,10 +14,21 @@ module.exports = {
 // Given a 2d list of greyscale pixel values, return all possible locations of
 // Chinese characters that do not overlap.
 function getAll(matrix) {
+  isDebugMode = true;
+  
+  var startTime = new Date().getTime();
+  
   var bubbles = processMatrix.getBubbles(matrix);
   var subbubbles = processBubble.getSubbubbles(bubbles);
   var charLocations = 
       processSubbubble.getCharacterLocations(matrix, subbubbles);
+      
+  var endTime = new Date().getTime();
+  console.log('\nFull run took: ', (endTime - startTime) / 1000, '\n');
+  
+  if (isDebugMode) {
+    debugPrints(matrix, bubbles, subbubbles, charLocations);
+  }
   return charLocations;
 }
 
@@ -32,16 +43,19 @@ function getNearCoord(matrix, coords) {
   var charLocations = 
       processSubbubble.getCharacterLocations(matrix, subbubbles);
   
-  // debug print blocks in full image
   if (isDebugMode) {
-    var filename1 = '0_bubbles_in_full_img.png';
-    imageUtil.debugPrintBoundariesWithOffsets(matrix, [bubble], filename1);
-    
-    var filename2 = '0_subbubbles_in_full_img.png';
-    imageUtil.debugPrintBoundariesWithOffsets(matrix, subbubbles, filename2);
-    
-    var filename3 = '0_char_locations_in_full_img.png';
-    imageUtil.debugPrintBoundaries(matrix, charLocations, filename3);
+    debugPrints(matrix, [bubble], subbubbles, charLocations);
   }
   return charLocations;
+}
+
+function debugPrints(matrix, bubbles, subbubbles, charLocations) {
+  var filename1 = '0_0_bubbles_in_full_img.png';
+  imageUtil.debugPrintBoundariesWithOffsets(matrix, bubbles, filename1);
+  
+  var filename2 = '0_1_subbubbles_in_full_img.png';
+  imageUtil.debugPrintBoundariesWithOffsets(matrix, subbubbles, filename2);
+  
+  var filename3 = '0_2_char_locations_in_full_img.png';
+  imageUtil.debugPrintBoundaries(matrix, charLocations, filename3);
 }

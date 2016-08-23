@@ -73,12 +73,9 @@ function getSubbubblesFromBubble(bubble, idx) {
       if (!util.isGap(markedMatrix[i][j]) && !visited[i][j]) {
         var subbubbleParams = getSubbubbleParams(markedMatrix, i, j, visited);
         if (subbubbleParams.hasSubbubble) {
-          console.log('\nfound subbubble');
-          
           if (isDebugMode) {
             debugPrintSubbubble(idx, subbubbles, markedMatrix, subbubbleParams);
           }
-          
           var subbubble = 
               new obj.Subbubble(
                   subbubbleParams.matrix, 

@@ -11,9 +11,9 @@ module.exports = {
 
 function getCharacterLocations(matrix, subbubbles) {
   console.log('\nGetting all character locations within subbubbles...');
-  console.log(subbubbles.length, 'subbubbles to process');
+  console.log(subbubbles.length + ' subbubbles to process');
   
-  isDebugMode = true;
+  // isDebugMode = true;
   
   var blocks = [];
   for (var i = 0; i < subbubbles.length; i++) {
@@ -272,7 +272,7 @@ function markGapsWithinBlock(markedMatrix, block) {
   // mark horizontal gaps
   if (util.hasEnoughLenToDissect(block.ylen)) {
     for (var i = ymin; i <= ymax; i++) {
-      if (!hasWordY[i]) {
+      if (!hasWordY[i - ymin]) {
         for (var j = xmin; j <= xmax; j++) {
           markedMatrix[i][j] = constants.GAP_VAL;
         }
@@ -282,7 +282,7 @@ function markGapsWithinBlock(markedMatrix, block) {
   // mark vertical gaps
   if (util.hasEnoughLenToDissect(block.xlen)) {
     for (var j = xmin; j <= xmax; j++) {
-      if (!hasWordX[j]) {
+      if (!hasWordX[j - xmin]) {
         for (var i = ymin; i <= ymax; i++) {
           markedMatrix[i][j] = constants.GAP_VAL;
         }
@@ -357,7 +357,9 @@ function postProcessBlocks(matrix, blocks) {
       });
 }
 
-// maybe change this to use CharacterLocation instead of Block
+// might want to change the algorithm, smaller is not always better
+// maybe change this to if overlap, check if similar, if so, the one with better
+// ratio is used.
 function resolveOverlappingBlocks(matrix, blocks) {
   var processedBlocks = [];
   
@@ -367,7 +369,7 @@ function resolveOverlappingBlocks(matrix, blocks) {
     yVisited.push(new Set());
   }
   var xVisited = [];
-  for (var j = 0; j < matrix.length; j++) {
+  for (var j = 0; j < matrix[0].length; j++) {
     xVisited.push(new Set());
   }
   
@@ -404,18 +406,18 @@ function isOverlap(ystart, yend, xstart, xend, yVisited, xVisited) {
   // get all blocks that occupy the y range from ystart to yend
   var yBlocks = new Set();
   for (var k = ystart; k <= yend; k++) {
-    Set.prototype.add.apply(yBlocks, Array.from(yVisited[k]));
+    yVisited[k].forEach(function(a, b, c) { yBlocks.add(a); });
   }
   // get all blocks that occupy the x range from xstart to xend
   var xBlocks = new Set();
   for (var k = xstart; k <= xend; k++) {
-    Set.prototype.add.apply(xBlocks, Array.from(xVisited[k]));
+    xVisited[k].forEach(function(a, b, c) { xBlocks.add(a); });
   }
   // find if they overlap
   return (new Set(
       Array.from(yBlocks).filter(
           function(idx) {
-            xBlocks.has(idx);
+            return xBlocks.has(idx);
           }))
           .size > 0);
 }
