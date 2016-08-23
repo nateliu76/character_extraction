@@ -42,8 +42,7 @@ module.exports = {
 function getSubbubbles(bubbles) {
   console.log('\nGetting all subbubbles within bubbles...');
   
-  // setting debug mode to true for now.
-  isDebugMode = true;
+  isDebugMode = false;
   
   var subbubbles = []
   for (var i = 0; i < bubbles.length; i++) {
@@ -62,7 +61,7 @@ function getSubbubblesFromBubble(bubble, idx) {
   
   if (isDebugMode) {
     var arr = imageUtil.mapMatrixValToGrey(markedMatrix, constants.GAP_VAL);
-    imageUtil.debugPrintMatrix(arr, '3_marked_matrix.png');
+    imageUtil.debugPrintMatrix(arr, '2_0_marked_matrix.png');
   }
   
   var visited = util.initNewArrayWithVal(matrix, false);
@@ -76,23 +75,13 @@ function getSubbubblesFromBubble(bubble, idx) {
         if (subbubbleParams.hasSubbubble) {
           console.log('\nfound subbubble');
           
-          // debug print subbubble on top of marked matrix
           if (isDebugMode) {
-            var filename = 
-                '4_' + idx + '_' + subbubbles.length + '_subbubble.png';
-            var ymin = subbubbleParams.yoffset;
-            var ymax = ymin + subbubbleParams.subbubbleMatrix.length - 1;
-            var xmin = subbubbleParams.xoffset;
-            var xmax = xmin + subbubbleParams.subbubbleMatrix[0].length - 1;
-            var boundary = new obj.Boundary(ymin, ymax, xmin, xmax);
-            var arr = 
-                imageUtil.mapMatrixValToGrey(markedMatrix, constants.GAP_VAL);
-            imageUtil.debugPrintBoundary(arr, boundary, filename);
+            debugPrintSubbubble(idx, subbubbles, markedMatrix, subbubbleParams);
           }
           
           var subbubble = 
               new obj.Subbubble(
-                  subbubbleParams.subbubbleMatrix, 
+                  subbubbleParams.matrix, 
                       yoffset + subbubbleParams.yoffset, 
                       xoffset + subbubbleParams.xoffset);
           subbubbles.push(subbubble);
@@ -101,6 +90,12 @@ function getSubbubblesFromBubble(bubble, idx) {
     }
   }
   return subbubbles;
+}
+
+function debugPrintSubbubble(idx, subbubbles, markedMatrix, subbubbleParams) {
+  var filename = '2_1_' + idx + '_' + subbubbles.length + '_subbubble.png';
+  var arr = imageUtil.mapMatrixValToGrey(markedMatrix, constants.GAP_VAL);
+  imageUtil.debugPrintBoundariesWithOffsets(arr, [subbubbleParams], filename);
 }
 
 function getSubbubbleParams(markedMatrix, ycoord, xcoord, visited) {
@@ -139,14 +134,12 @@ function getSubbubbleParams(markedMatrix, ycoord, xcoord, visited) {
           }
         }
       }
-      
       // search nearby coordinates for rectangles close by
       // add them to the stack if found
       pushNearbyRectsToStack(
           markedMatrix, ymincurr, ymaxcurr, xmincurr, xmaxcurr, stack);
     }
   }
-  
   // check if the current subbubble has enough black pixels. If so, copy the 
   // subbubble's portion of the matrix (without gaps marked) and return it
   // along with other parameters
@@ -164,7 +157,7 @@ function getSubbubbleParams(markedMatrix, ycoord, xcoord, visited) {
     }
     return {
         hasSubbubble: true, 
-        subbubbleMatrix: subbubbleMatrix, 
+        matrix: subbubbleMatrix, 
         yoffset: ymin, 
         xoffset: xmin};
   } else {

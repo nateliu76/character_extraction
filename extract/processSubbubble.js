@@ -9,7 +9,7 @@ module.exports = {
   getCharacterLocations: getCharacterLocations
 };
 
-function getCharacterLocations(subbubbles) {
+function getCharacterLocations(matrix, subbubbles) {
   console.log('\nGetting all character locations within subbubbles...');
   console.log(subbubbles.length, 'subbubbles to process');
   
@@ -23,27 +23,27 @@ function getCharacterLocations(subbubbles) {
     
     // debug print blocks pre dissect
     if (isDebugMode) {
-      console.log('finished getting blocks from marked matrix');
       var arr = imageUtil.mapMatrixValToGrey(markedMatrix, constants.GAP_VAL);
-      var filename = '5_' + i + '_raw_blocks.png';
+      var filename = '3_1_' + i + '_raw_blocks.png';
       imageUtil.debugPrintBoundaries(arr, rawBlocks, filename);
     }
     
     var processedBlocks = maybeDissectSomeBlocks(markedMatrix, rawBlocks);
     
-    // debug print blocks pre merge
+    var finalBlocks = maybeMergeSomeBlocks(markedMatrix, processedBlocks);
+    
     if (isDebugMode) {
       var arr = imageUtil.mapMatrixValToGrey(markedMatrix, constants.GAP_VAL);
-      var filename = '6_' + i + '_dissected_blocks.png';
+      var filename = '3_2_' + i + '_dissected_blocks.png';
       imageUtil.debugPrintBoundaries(arr, processedBlocks, filename);
+      
+      arr = imageUtil.mapMatrixValToGrey(markedMatrix, constants.GAP_VAL);
+      filename = '3_3_' + i + '_merged_blocks.png';
+      imageUtil.debugPrintBoundaries(arr, finalBlocks, filename);
     }
-    continue;
     
-    var finalBlocks = maybeMergeSomeBlocks(processedBlocks);
-    
-    // debug print blocks post merge
-    
-    Arrays.prototype.push.apply(
+    // add offsets
+    Array.prototype.push.apply(
         blocks,
         finalBlocks.map(
             function(block) {
@@ -52,7 +52,7 @@ function getCharacterLocations(subbubbles) {
               return block;
             }));
   }
-  return postProcessBlocks(blocks);
+  return postProcessBlocks(matrix, blocks);
 }
 
 function maybeMergeSomeBlocks(markedMatrix, blocks) {
@@ -75,18 +75,129 @@ function maybeMergeSomeBlocks(markedMatrix, blocks) {
 }
 
 function shouldTryMerging(block) {
-  // not sure if block.hasBlackPix is the good to have here...
+  // not sure if block.hasBlackPix is the good to have here, it worked well in
+  // the prototype so let's keep it here for now
   return !block.matched 
       && block.hasBlackPix 
           && block.ratio < constants.MERGE_RATIO_THRES;
 }
 
-function getMergedBlock() {
-  
+function getMergedBlock(block) {
+  if (block.ylen > block.xlen) {
+    return mergeWithRight(block);
+  } else {
+    return mergeWithDown(block);
+  }
 }
 
-function markAdjBlocks(markedMatrix, blocks) {
+function mergeWithRight(block) {
+  var ymin = block.ymin;
+  var ymax = block.ymax;
+  var xmin = block.xmin;
+  var xmax = block.xmax;
+  var ratio = block.ratio;
+  var blackPixCount = block.blackPixCount;
   
+  var nextRightBlock = block.rightBlock;
+  for (var i = 0; nextRightBlock && i < constants.MAX_MERGE_NUM; i++) {
+    var xmaxRight = nextRightBlock.xmax;
+    var mergedRatio =
+        util.blockRatio(block.ylen, xmaxRight - xmin + 1);
+    if (mergedRatio > Math.max(ratio, nextRightBlock.ratio)) {
+      ratio = mergedRatio;
+      xmax = xmaxRight;
+      blackPixCount += nextRightBlock.blackPixCount;
+      nextRightBlock.matched = true;
+      nextRightBlock = nextRightBlock.rightBlock;
+      
+    } else {
+      break;
+    }
+  }
+  return new obj.Block(ymin, ymax, xmin, xmax, blackPixCount);
+}
+
+function mergeWithDown(block) {
+  var ymin = block.ymin;
+  var ymax = block.ymax;
+  var xmin = block.xmin;
+  var xmax = block.xmax;
+  var ratio = block.ratio;
+  var blackPixCount = block.blackPixCount;
+  
+  var nextDownBlock = block.downBlock;
+  for (var i = 0; nextDownBlock && i < constants.MAX_MERGE_NUM; i++) {
+    var ymaxDown = nextDownBlock.ymax;
+    var mergedRatio =
+        util.blockRatio(ymaxDown - ymin + 1, block.ylen);
+    if (mergedRatio > Math.max(ratio, nextDownBlock.ratio)) {
+      ratio = mergedRatio;
+      ymax = ymaxDown;
+      blackPixCount += nextDownBlock.blackPixCount;
+      nextDownBlock.matched = true;
+      nextDownBlock = nextDownBlock.rightBlock;
+      
+    } else {
+      break;
+    }
+  }
+  return new obj.Block(ymin, ymax, xmin, xmax, blackPixCount);
+}
+
+// modifies the blocks' downBlock and rightBlock pointer
+function markAdjBlocks(markedMatrix, blocks) {
+  // get entire matrix marked as gaps
+  var regions = util.initNewArrayWithVal(markedMatrix, constants.GAP_VAL);
+  
+  // first pass, mark regions of each block
+  for (var k = 0; k < blocks.length; k++) {
+    var block = blocks[k];
+    var ymin = block.ymin;
+    var ymax = block.ymax;
+    var xmin = block.xmin;
+    var xmax = block.xmax;
+    
+    // mark left
+    for (var i = ymin; i <= ymax; i++) {
+      regions[i][xmin] = k;
+    }
+    // mark top
+    for (var j = xmin; j <= xmax; j++) {
+      regions[ymin][j] = k;
+    }
+  }
+  
+  // second pass, mark the blocks that are to the current block's right/below
+  for (var k = 0; k < blocks.length; k++) {
+    var block = blocks[k];
+    var ymin = block.ymin;
+    var ymax = block.ymax;
+    var xmin = block.xmin;
+    var xmax = block.xmax;
+    
+    // search down
+    for (var i = ymax + 1; i < markedMatrix.length; i++) {
+      if (!util.isGap(regions[i][xmin])) {
+        var blockBelow = blocks[regions[i][xmin]];
+        // verify the xmin and xmax match
+        if (block.xmin === blockBelow.xmin && block.xmax === blockBelow.xmax) {
+          block.downBlock = blockBelow;
+        }
+        break;
+      }
+    }
+    // search right
+    for (var j = xmax + 1; j < markedMatrix[0].length; j++) {
+      if (!util.isGap(regions[ymin][j])) {
+        var blockRight = blocks[regions[ymin][j]];
+        // verify the ymin and ymax match
+        if (block.ymin === blockRight.ymin && block.ymax === blockRight.ymax) {
+          block.rightBlock = blockRight;
+        }
+        break;
+      }
+    }
+  }
 }
 
 // modifies markedMatrix
@@ -238,15 +349,73 @@ function hasReachedRightBoundary(matrix, i, j) {
       && (j + 1 >= matrix[0].length || util.isGap(matrix[i][j + 1]));
 }
 
-function postProcessBlocks(blocks) {
-  var resolvedBlocks = resolveOverlappingBlocks(blocks); 
-  return 
-      resolvedBlocks.map(
-          function(block) {
-            return new obj.CharacterLocation(block);
-          });
+function postProcessBlocks(matrix, blocks) {
+  var resolvedBlocks = resolveOverlappingBlocks(matrix, blocks); 
+  return resolvedBlocks.map(
+      function(block) {
+        return new obj.CharacterLocation(block);
+      });
 }
 
-function resolveOverlappingBlocks(blocks) {
+// maybe change this to use CharacterLocation instead of Block
+function resolveOverlappingBlocks(matrix, blocks) {
+  var processedBlocks = [];
   
+  // initialize list of sets
+  var yVisited = [];
+  for (var i = 0; i < matrix.length; i++) {
+    yVisited.push(new Set());
+  }
+  var xVisited = [];
+  for (var j = 0; j < matrix.length; j++) {
+    xVisited.push(new Set());
+  }
+  
+  // sort blocks by area size
+  blocks.sort(
+      function(block1, block2) {
+        return block1.xlen * block1.ylen - block2.xlen * block2.ylen;
+      });
+  
+  // iterate through blocks to find if there are any overlaps
+  for (var blockIdx = 0; blockIdx < blocks.length; blockIdx++) {
+    var block = blocks[blockIdx];
+    var ystart = block.ymin + block.yoffset;
+    var yend = block.ymax + block.yoffset;
+    var xstart = block.xmin + block.xoffset;
+    var xend = block.xmax + block.xoffset;
+    
+    // add current block to be returned if there are no overlaps
+    if (!isOverlap(ystart, yend, xstart, xend, yVisited, xVisited)) {
+      processedBlocks.push(block);
+      // update visited
+      for (var i = ystart; i <= yend; i++) {
+        yVisited[i].add(blockIdx);
+      }
+      for (var j = xstart; j <= xend; j++) {
+        xVisited[j].add(blockIdx);
+      }
+    }
+  }
+  return processedBlocks;
+}
+
+function isOverlap(ystart, yend, xstart, xend, yVisited, xVisited) {
+  // get all blocks that occupy the y range from ystart to yend
+  var yBlocks = new Set();
+  for (var k = ystart; k <= yend; k++) {
+    Set.prototype.add.apply(yBlocks, Array.from(yVisited[k]));
+  }
+  // get all blocks that occupy the x range from xstart to xend
+  var xBlocks = new Set();
+  for (var k = xstart; k <= xend; k++) {
+    Set.prototype.add.apply(xBlocks, Array.from(xVisited[k]));
+  }
+  // find if they overlap
+  return (new Set(
+      Array.from(yBlocks).filter(
+          function(idx) {
+            xBlocks.has(idx);
+          }))
+          .size > 0);
 }

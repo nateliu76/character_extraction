@@ -37,8 +37,8 @@ function Block(ymin, ymax, xmin, xmax, blackPixCount) {
   
   this.blackPixCount = blackPixCount;
   
-  this.downBlock = null;
-  this.rightBlock = null;
+  this.downBlock = false;
+  this.rightBlock = false;
   this.isCombinedWithOtherBlock = false;
   
   this.isValidBlock = function() {
@@ -59,7 +59,7 @@ function CharacterLocation(block) {
   this.ymax = block.ymax + block.yoffset;
   this.xmin = block.xmin + block.xoffset;
   this.xmax = block.xmax + block.xoffset;
-  this.blackPixCount = blackPixCount;
+  this.blackPixCount = block.blackPixCount;
 }
 
 function Boundary(ymin, ymax, xmin, xmax) {

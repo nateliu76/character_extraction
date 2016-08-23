@@ -1,4 +1,5 @@
 const jimp = require('jimp');
+const obj = require('../obj');
 const util = require('./util');
 
 const HIGHLIGHT_GREEN = -1;
@@ -17,7 +18,8 @@ module.exports = {
   debugPrintBubblePix: debugPrintBubblePix,
   debugPrintOnlyBubblePix: debugPrintOnlyBubblePix,
   mapMatrixValToGrey: mapMatrixValToGrey,
-  debugPrintBoundaries: debugPrintBoundaries
+  debugPrintBoundaries: debugPrintBoundaries,
+  debugPrintBoundariesWithOffsets: debugPrintBoundariesWithOffsets
 };
 
 // Saves the matrix to an image using the filename.
@@ -82,6 +84,19 @@ function debugPrintBoundaries(matrix, boundaries, filename) {
     markBoundary(arr, boundaries[i], HIGHLIGHT_GREEN);
   }
   saveImage(arr, filename);
+}
+
+function debugPrintBoundariesWithOffsets(matrix, objects, filename) {
+  var boundaries = 
+      objects.map(
+          function(block) {
+            var ymin = block.yoffset;
+            var ymax = ymin + block.matrix.length - 1;
+            var xmin = block.xoffset;
+            var xmax = xmin + block.matrix[0].length - 1;
+            return new obj.Boundary(ymin, ymax, xmin, xmax);
+          });
+  debugPrintBoundaries(matrix, boundaries, filename);
 }
 
 function debugPrintBubblePix(

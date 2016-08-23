@@ -69,7 +69,8 @@ function getBubbles(matrix) {
 
 function getBubbleEnclosingCoord(matrix, coords) {
   console.log('\ngetting bubble enclosing', coords + '...');
-  isDebugMode = true;
+  
+  isDebugMode = false;
   
   // ordered this way for ease of debugging since that is the way the coordinate
   // is formatted in ms paint
@@ -92,12 +93,13 @@ function getBubbleEnclosingCoord(matrix, coords) {
     var xoffset = bubbleTextParams.xoffset + boundary.xmin;
     
     if (isDebugMode) {
-      imageUtil.debugPrintBubblePix(
-          matrix, boundary, visitedWhitePix, bubbleIdx, '0_bubble_marked.png');
-      imageUtil.debugPrintOnlyBubblePix(
-          matrix, boundary, isWhitePixOfBubble, '1_bubble_only.png');
-      imageUtil.debugPrintMatrix(
-          bubbleTextParams.bubbleMatrix, '2_clean_bubble.png');
+      debugPrintBubble(
+          matrix,
+          boundary, 
+          visitedWhitePix, 
+          bubbleIdx, 
+          isWhitePixOfBubble, 
+          bubbleTextParams);
     }
     
     if (util.hasEnoughBlackPixForBlock(bubbleTextParams.blackPixCount)) {
@@ -109,6 +111,21 @@ function getBubbleEnclosingCoord(matrix, coords) {
   }
   // TODO: return something smarter
   return new obj.Bubble(false, yoffset, xoffset);
+}
+
+function debugPrintBubble(
+    matrix,
+    boundary, 
+    visitedWhitePix, 
+    bubbleIdx, 
+    isWhitePixOfBubble, 
+    bubbleTextParams) {
+  imageUtil.debugPrintBubblePix(
+      matrix, boundary, visitedWhitePix, bubbleIdx, '1_0_bubble_marked.png');
+  imageUtil.debugPrintOnlyBubblePix(
+      matrix, boundary, isWhitePixOfBubble, '1_1_bubble_only.png');
+  imageUtil.debugPrintMatrix(
+      bubbleTextParams.bubbleMatrix, '1_2_clean_bubble.png');
 }
 
 // a wrapping function around getBubbleParams() that uses BFS to find the white
