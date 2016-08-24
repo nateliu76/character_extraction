@@ -6,18 +6,28 @@ Dependencies: [Jimp](https://github.com/oliver-moran/jimp)
 
 Installation: `npm install --save jimp`
 
-There are two methods of the API:
+There are two ways of extracting characters:
 
 1. `extractCharacterLocations.getAll()`
 2. `extractCharacterLocations.getNearCoord()`
 
-Currently both are partially complete, and only `extractCharacterLocations.getNearCoord` is tested.
 
-Details to be filled in soon.
+The two methods are wrapped by `main.js`.
 
-To run on command line in debug mode:
+To run on command line:
+
+`node main.js imageFileOfChoice`
+
+or 
+
 `node main.js imageFileOfChoice xCoordinate yCoordinate`
 
+
+The current setup will save images of:
+
+1. Full image with locations of bubbles marked
+2. Full image with locations of sub-bubbles marked
+3. Full image with locations of character locations marked
 
 ## `character_extraction_prototype.py`
 

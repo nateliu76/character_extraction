@@ -3,8 +3,6 @@ const imageUtil = require('./utils/imageUtil');
 const obj = require('./obj');
 const util = require('./utils/util');
 
-var isDebugMode = false;
-
 // This class is used to deal with the case where we have multiple bubbles that
 // are merged. This separates the bubbles into separate sub-bubbles for ease of
 // processing. 
@@ -42,8 +40,6 @@ module.exports = {
 function getSubbubbles(bubbles) {
   console.log('\nGetting all subbubbles within bubbles...');
   
-  isDebugMode = false;
-  
   var subbubbles = []
   for (var i = 0; i < bubbles.length; i++) {
     var subbbubblesFromCurrBubble = getSubbubblesFromBubble(bubbles[i], i);
@@ -59,7 +55,7 @@ function getSubbubblesFromBubble(bubble, idx) {
   
   var markedMatrix = util.getMatrixWithMarkedGaps(matrix);
   
-  if (isDebugMode) {
+  if (constants.IS_DEBUG_PRINT_PROCESS_BUBBLE) {
     var arr = imageUtil.mapMatrixValToGrey(markedMatrix, constants.GAP_VAL);
     imageUtil.debugPrintMatrix(arr, '2_0_marked_matrix.png');
   }
@@ -73,7 +69,7 @@ function getSubbubblesFromBubble(bubble, idx) {
       if (!util.isGap(markedMatrix[i][j]) && !visited[i][j]) {
         var subbubbleParams = getSubbubbleParams(markedMatrix, i, j, visited);
         if (subbubbleParams.hasSubbubble) {
-          if (isDebugMode) {
+          if (constants.IS_DEBUG_PRINT_PROCESS_BUBBLE) {
             debugPrintSubbubble(idx, subbubbles, markedMatrix, subbubbleParams);
           }
           var subbubble = 

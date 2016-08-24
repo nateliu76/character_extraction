@@ -1,6 +1,8 @@
 const constants = require('./utils/constants');
 const util = require('./utils/util');
 
+// Container objects used
+
 module.exports = {
   Bubble: Bubble,
   Subbubble: Subbubble,
@@ -9,18 +11,23 @@ module.exports = {
   Boundary: Boundary
 };
 
+// offsets are the offsets of the bubble's matrix in relation to the image
+// matrix
 function Bubble(matrix, yoffset, xoffset) {
   this.matrix = matrix;
   this.yoffset = yoffset;
   this.xoffset = xoffset;
 }
 
+// offsets are the offsets of the subbubble's matrix in relation to the image
+// matrix
 function Subbubble(matrix, yoffset, xoffset) {
   this.matrix = matrix;
   this.yoffset = yoffset;
   this.xoffset = xoffset;
 }
 
+// 
 function Block(ymin, ymax, xmin, xmax, blackPixCount) {
   this.ymin = ymin;
   this.ymax = ymax;
@@ -41,13 +48,6 @@ function Block(ymin, ymax, xmin, xmax, blackPixCount) {
   this.rightBlock = false;
   this.isCombinedWithOtherBlock = false;
   
-  this.isValidBlock = function() {
-    var isValidSize = 
-        this.blockSize > constants.MIN_BLOCK_SIZE 
-            && this.blockSize < constants.MAX_BLOCK_SIZE;
-    return isValidSize && util.hasEnoughBlackPixForBlock(this.blackPixCount);
-  }
-  
   this.hasBlackPix = function() {
     return this.blackPixCount > 0;
   }
@@ -62,6 +62,7 @@ function CharacterLocation(block) {
   this.blackPixCount = block.blackPixCount;
 }
 
+// basically a Rect object
 function Boundary(ymin, ymax, xmin, xmax) {
   this.ymin = ymin;
   this.ymax = ymax;

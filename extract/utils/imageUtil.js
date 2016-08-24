@@ -10,6 +10,10 @@ const BLUE_HEX = jimp.rgbaToInt(0, 255, 255, 255);
 const GREY_HEX = jimp.rgbaToInt(125, 125, 125, 255);
 const MARGIN = 2;
 
+// Methods used to interact with Jimp
+// includes image saving for debugging, and helper methods that help generate
+// matrices for debugging.
+
 module.exports = {
   saveImage: saveImage,
   imageToMatrix: imageToMatrix,

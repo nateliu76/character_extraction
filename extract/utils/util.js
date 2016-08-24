@@ -1,5 +1,7 @@
 const constants = require('./constants');
 
+// Common methods
+
 module.exports = {
   initNewArrayWithVal: initNewArrayWithVal,
   isBlackPixel: isBlackPixel,
@@ -39,7 +41,7 @@ function hasEnoughWhitePixForBlock(whitePixCount) {
 }
 
 function blockRatio(len1, len2) {
-  return Math.min(len1, len2) * 1.0 / Math.max(len1, len2);
+  return Math.min(len1, len2) / Math.max(len1, len2);
 }
 
 function isGap(pixVal) {

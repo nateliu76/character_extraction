@@ -4,11 +4,6 @@ const obj = require('./obj');
 const queue =  require('./utils/Queue');
 const util = require('./utils/util');
 
-var isDebugMode = false;
-
-// The comments below perhaps should be moved to perhaps a place where the 
-// algorithm is explained.
-
 // This program makes the following assumptions and use them as heuristics:
 // 1. The color of words within a text bubble is black
 // 2. The color of the text bubble is white
@@ -70,8 +65,6 @@ function getBubbles(matrix) {
 function getBubbleEnclosingCoord(matrix, coords) {
   console.log('\ngetting bubble enclosing', coords + '...');
   
-  isDebugMode = false;
-  
   // ordered this way for ease of debugging since that is the way the coordinate
   // is formatted in ms paint
   var xcoord = parseInt(coords[0]);
@@ -92,7 +85,7 @@ function getBubbleEnclosingCoord(matrix, coords) {
     var yoffset = bubbleTextParams.yoffset + boundary.ymin;
     var xoffset = bubbleTextParams.xoffset + boundary.xmin;
     
-    if (isDebugMode) {
+    if (constants.IS_DEBUG_PRINT_PROCESS_MATRIX) {
       debugPrintBubble(
           matrix,
           boundary, 

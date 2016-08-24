@@ -1,10 +1,18 @@
+const constants = require('./extract/utils/constants');
 const imageUtil = require('./extract/utils/imageUtil');
 const obj = require('./extract/obj');
 const processMatrix = require('./extract/processMatrix');
 const processBubble = require('./extract/processBubble');
 const processSubbubble = require('./extract/processSubbubble');
 
-var isDebugMode = false;
+// API for extracting Chinese character locations in manga/comics
+// There are two methods available
+// 1. Get all possible character locations in the image matrix
+// 2. Get all possible character locations in the text bubble enclosing the 
+//    given coordinate
+
+// The image matrix needs to be a greyscale 2D list of pixel values
+// See main.js as an example
 
 module.exports = {
   getAll: getAll,
@@ -14,19 +22,23 @@ module.exports = {
 // Given a 2d list of greyscale pixel values, return all possible locations of
 // Chinese characters that do not overlap.
 function getAll(matrix) {
-  isDebugMode = true;
-  
-  var startTime = new Date().getTime();
-  
+  var startTime1 = new Date().getTime();
   var bubbles = processMatrix.getBubbles(matrix);
+  
+  var startTime2 = new Date().getTime();
   var subbubbles = processBubble.getSubbubbles(bubbles);
+  
+  var startTime3 = new Date().getTime();
   var charLocations = 
       processSubbubble.getCharacterLocations(matrix, subbubbles);
       
   var endTime = new Date().getTime();
-  console.log('\nFull run took: ', (endTime - startTime) / 1000, '\n');
   
-  if (isDebugMode) {
+  if (constants.IS_DEBUG_PRINT_ALL_IN_FULL_IMG) {
+    console.log('\nFull run    : ', (endTime - startTime1) / 1000, 's');
+    console.log('Get bubbles   : ', (startTime2 - startTime1) / 1000, 's');
+    console.log('Get subbubbles: ', (startTime3 - startTime2) / 1000, 's');
+    console.log('Get locations : ', (endTime - startTime3) / 1000, 's\n');
     debugPrints(matrix, bubbles, subbubbles, charLocations);
   }
   return charLocations;
@@ -36,14 +48,12 @@ function getAll(matrix) {
 // possible locations of Chinese characters in a manga/comic text bubble that
 // encloses the given coordinates. The locations do not overlap with each other.
 function getNearCoord(matrix, coords) {
-  isDebugMode = true;
-  
   var bubble = processMatrix.getBubbleEnclosingCoord(matrix, coords);
   var subbubbles = processBubble.getSubbubbles([bubble]);
   var charLocations = 
       processSubbubble.getCharacterLocations(matrix, subbubbles);
   
-  if (isDebugMode) {
+  if (constants.IS_DEBUG_PRINT_ALL_IN_FULL_IMG) {
     debugPrints(matrix, [bubble], subbubbles, charLocations);
   }
   return charLocations;

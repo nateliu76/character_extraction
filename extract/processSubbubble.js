@@ -3,7 +3,21 @@ const imageUtil = require('./utils/imageUtil');
 const obj = require('./obj');
 const util = require('./utils/util');
 
-var isDebugMode = false;
+// Marks the gaps within the subbubbles, and extracts the rectangles that have
+// black pixels within
+
+// Some blocks are further broken down to mark gaps within since they might not
+// have been fully processed due to unaligned characters next to them
+
+// Some blocks are merged with others to form squares. Since Chinese characters
+// mostly have a square shape, we use this as a heuristic to combine characters
+// that would be otherwise separated by the gap marking mechanism into two or
+// more blocks, Ex: 是, 二, 引
+
+// Finally, all blocks that have overlaps are resolved since characters cannot
+// have overlaps
+
+// The blocks are then converted to the CharacterLocation class and returned
 
 module.exports = {
   getCharacterLocations: getCharacterLocations
@@ -13,8 +27,6 @@ function getCharacterLocations(matrix, subbubbles) {
   console.log('\nGetting all character locations within subbubbles...');
   console.log(subbubbles.length + ' subbubbles to process');
   
-  // isDebugMode = true;
-  
   var blocks = [];
   for (var i = 0; i < subbubbles.length; i++) {
     var markedMatrix = util.getMatrixWithMarkedGaps(subbubbles[i].matrix);
@@ -22,17 +34,16 @@ function getCharacterLocations(matrix, subbubbles) {
     var rawBlocks = getBlocksFromMarkedMatrix(markedMatrix);
     
     // debug print blocks pre dissect
-    if (isDebugMode) {
+    if (constants.IS_DEBUG_PRINT_PROCESS_SUBBUBBLE) {
       var arr = imageUtil.mapMatrixValToGrey(markedMatrix, constants.GAP_VAL);
       var filename = '3_1_' + i + '_raw_blocks.png';
       imageUtil.debugPrintBoundaries(arr, rawBlocks, filename);
     }
     
     var processedBlocks = maybeDissectSomeBlocks(markedMatrix, rawBlocks);
-    
     var finalBlocks = maybeMergeSomeBlocks(markedMatrix, processedBlocks);
     
-    if (isDebugMode) {
+    if (constants.IS_DEBUG_PRINT_PROCESS_SUBBUBBLE) {
       var arr = imageUtil.mapMatrixValToGrey(markedMatrix, constants.GAP_VAL);
       var filename = '3_2_' + i + '_dissected_blocks.png';
       imageUtil.debugPrintBoundaries(arr, processedBlocks, filename);
@@ -64,14 +75,21 @@ function maybeMergeSomeBlocks(markedMatrix, blocks) {
     
     if (shouldTryMerging(block)) {
       var mergedBlock = getMergedBlock(block);
-      if (mergedBlock.isValidBlock()) {
+      if (isValidBlock(mergedBlock)) {
         finalBlocks.push(mergedBlock);
       }
-    } else if (!block.matched && block.isValidBlock()) {
+    } else if (!block.matched && isValidBlock(block)) {
       finalBlocks.push(block);
     }
   }
   return finalBlocks;
+}
+
+function isValidBlock(block) {
+  var isValidSize = 
+      block.blockSize > constants.MIN_BLOCK_SIZE 
+          && block.blockSize < constants.MAX_BLOCK_SIZE;
+  return isValidSize && util.hasEnoughBlackPixForBlock(block.blackPixCount);
 }
 
 function shouldTryMerging(block) {
@@ -129,13 +147,13 @@ function mergeWithDown(block) {
   for (var i = 0; nextDownBlock && i < constants.MAX_MERGE_NUM; i++) {
     var ymaxDown = nextDownBlock.ymax;
     var mergedRatio =
-        util.blockRatio(ymaxDown - ymin + 1, block.ylen);
+        util.blockRatio(ymaxDown - ymin + 1, block.xlen);
     if (mergedRatio > Math.max(ratio, nextDownBlock.ratio)) {
       ratio = mergedRatio;
       ymax = ymaxDown;
       blackPixCount += nextDownBlock.blackPixCount;
       nextDownBlock.matched = true;
-      nextDownBlock = nextDownBlock.rightBlock;
+      nextDownBlock = nextDownBlock.downBlock;
       
     } else {
       break;
@@ -376,7 +394,7 @@ function resolveOverlappingBlocks(matrix, blocks) {
   // sort blocks by area size
   blocks.sort(
       function(block1, block2) {
-        return block1.xlen * block1.ylen - block2.xlen * block2.ylen;
+        return block1.blockSize - block2.blockSize;
       });
   
   // iterate through blocks to find if there are any overlaps
