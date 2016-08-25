@@ -12,7 +12,8 @@ There are two ways of extracting characters:
 2. `extractCharacterLocations.getNearCoord()`
 
 
-The two methods are wrapped by `main.js`.
+
+The two methods are wrapped by `main.js`, you can treat it as a demo on how `extractCharacterLocations.js` is called.
 
 To run on command line:
 
