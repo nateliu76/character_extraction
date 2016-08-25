@@ -47,8 +47,8 @@ function getAll(matrix) {
 // Given a 2d list of greyscale pixel values and a coordinate, return all 
 // possible locations of Chinese characters in a manga/comic text bubble that
 // encloses the given coordinates. The locations do not overlap with each other.
-function getNearCoord(matrix, coords) {
-  var bubble = processMatrix.getBubbleEnclosingCoord(matrix, coords);
+function getNearCoord(matrix, ycoord, xcoord) {
+  var bubble = processMatrix.getBubbleEnclosingCoord(matrix, ycoord, xcoord);
   var subbubbles = processBubble.getSubbubbles([bubble]);
   var charLocations = 
       processSubbubble.getCharacterLocations(matrix, subbubbles);

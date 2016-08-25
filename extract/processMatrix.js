@@ -62,13 +62,9 @@ function getBubbles(matrix) {
   return bubbles;
 }
 
-function getBubbleEnclosingCoord(matrix, coords) {
-  console.log('\ngetting bubble enclosing', coords + '...');
+function getBubbleEnclosingCoord(matrix, ycoord, xcoord) {
+  console.log('\ngetting bubble enclosing', ycoord, xcoord, '...');
   
-  // ordered this way for ease of debugging since that is the way the coordinate
-  // is formatted in ms paint
-  var xcoord = parseInt(coords[0]);
-  var ycoord = parseInt(coords[1]);
   var visitedWhitePix = util.initNewArrayWithVal(matrix, 0);
   
   var bubbleParams = 

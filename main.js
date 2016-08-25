@@ -3,7 +3,9 @@ const imageUtil = require('./extract/utils/imageUtil');
 const extractCharLocations = require('./extractCharacterLocations');
 
 function startProcess(coords, error, img) {
-  if (error) throw error;
+  if (error) {
+    throw error;
+  }
   
   img.greyscale();
   console.log('width: ', img.bitmap.width);
@@ -11,10 +13,15 @@ function startProcess(coords, error, img) {
   
   var matrix = imageUtil.imageToMatrix(img);
   
-  var locations = 
-      coords 
-          ? extractCharLocations.getNearCoord(matrix, coords) 
-          : extractCharLocations.getAll(matrix);
+  if (coords) {
+    // ordered this way for ease of debugging since x, y is the way the 
+    // coordinate is formatted in ms paint (as opposed to y, x)
+    var xcoord = parseInt(coords[0]);
+    var ycoord = parseInt(coords[1]);
+    extractCharLocations.getNearCoord(matrix, ycoord, xcoord) 
+  } else {
+    extractCharLocations.getAll(matrix);
+  }
   
   console.log('\ndone, closing...');
 }
