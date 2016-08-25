@@ -109,7 +109,7 @@ ymin and xmin are offsets of the subbubble matrix within the bubble matrix.
 
 '''      
 def get_subbubbles_from_bubble(bubble_matrix, idx=''):
-  print 'finding all subbubbles of bubble...'
+  # print 'finding all subbubbles of bubble...'
   bubble_matrix_w_gaps = mark_gaps_in_matrix(bubble_matrix, idx)
   visited = \
       [[False] * len(bubble_matrix[0]) for x in xrange(len(bubble_matrix))]
@@ -121,7 +121,7 @@ def get_subbubbles_from_bubble(bubble_matrix, idx=''):
         subbubble = get_subbubble(bubble_matrix_w_gaps, i, j, visited)
         if subbubble:
           subbubbles.append(subbubble)
-          print 'found subbubble:', str(len(subbubbles))
+          # print 'found subbubble:', str(len(subbubbles))
     
   # print the boundaries of the subbubble in the image
   if DEBUG_MODE:
@@ -153,7 +153,7 @@ at the end.
 def get_blocks_from_subbubbles(subbubbles):
   blocks = []
   for i, subbubble in enumerate(subbubbles):
-    print 'processing subbubble', (i + 1)
+    # print 'processing subbubble', (i + 1)
   
     subbubble_matrix, yoffset, xoffset = subbubble
     subbubble_w_gaps = mark_gaps_in_matrix(subbubble_matrix, str(i))
@@ -365,7 +365,7 @@ Returns the matrix with marked gaps.
 
 '''
 def mark_gaps_in_matrix(matrix, idx):
-  print 'marking gaps...'
+  # print 'marking gaps...'
   matrix_w_gaps = [list(x) for x in matrix]
   vert_has_word = [False] * len(matrix)
   horz_has_word = [False] * len(matrix[0])
@@ -768,15 +768,15 @@ def get_all_blocks_in_image(matrix):
                   for x in xrange(xmin, xmax + 1)] \
                   for y in xrange(ymin, ymax + 1)]
           
-          print '\ngetting clear image of text...'
+          # print '\ngetting clear image of text...'
           bubble_and_parameters = \
               get_clear_image_w_text(matrix, bubble_boundary, \
                                      is_white_pix_of_bubble, str(bubble_count))
           bubble_matrix, black_pix_count, offsets = bubble_and_parameters
           
           if bubble_matrix and is_enough_black_pix_for_block(black_pix_count):
-            print '%dth bubble found' % (bubble_count + 1)
-            print 'Bubble found at:', bubble_boundary, 'from:', (i, j)
+            # print '%dth bubble found' % (bubble_count + 1)
+            # print 'Bubble found at:', bubble_boundary, 'from:', (i, j)
             bubble_count += 1
             yoffset, xoffset = get_bubble_offsets(offsets, bubble_boundary)
             bubble_matrices_w_offsets.append((bubble_matrix, yoffset, xoffset))
@@ -941,7 +941,7 @@ return the tightened bubble.
 
 '''
 def get_clear_image_w_text(matrix, boundary, visited_white_pix, idx=''):
-  print "Running 2nd flood fill from corners"
+  # print "Running 2nd flood fill from corners"
   
   background_pixels = get_background_pixels(visited_white_pix, boundary, matrix)
   
@@ -980,7 +980,7 @@ x and y offset of the tightened bubble in the original image.
 
 '''
 def tighten_bubble_boundary(bubble_matrix, idx):
-  print "Cropping extra white space..."
+  # print "Cropping extra white space..."
   xmin = len(bubble_matrix[0])
   xmax = -1
   ymin = len(bubble_matrix)

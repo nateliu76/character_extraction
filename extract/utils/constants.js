@@ -20,7 +20,7 @@ module.exports = {
   // black if pixVal < BLACK_COLOR_THRES
   BLACK_COLOR_THRES: 60,
   // white if pixVal > WHITE_COLOR_THRES
-  WHITE_COLOR_THRES: 230,
+  WHITE_COLOR_THRES: 235,
   
   // the minimum/maximum size that's valid for a block
   MIN_BLOCK_SIZE: 8,
