@@ -2,6 +2,9 @@ const jimp = require('jimp');
 const imageUtil = require('./extract/utils/imageUtil');
 const extractCharLocations = require('./extractCharacterLocations');
 
+// This is an example of how to use extractCharacterLocations.js.
+// Reads in arguments from the command line and does corresponding action.
+
 function startProcess(coords, error, img) {
   if (error) {
     throw error;
@@ -34,7 +37,7 @@ function main() {
   }
   console.log('reading image...');
   
-  // opens the image and starts processing it
+  // open the image and start processing it
   var filename = args[2];
   var coords = args.length === 5 ? [args[3], args[4]] : false;
   jimp.read(filename, startProcess.bind(null, coords));

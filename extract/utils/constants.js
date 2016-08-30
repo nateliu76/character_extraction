@@ -47,5 +47,10 @@ module.exports = {
   // the y/x or x/y ratio needed to not be merged with nearby blocks
   MERGE_RATIO_THRES: 0.85,
   // the maximum amont of merges that can happen for a block merge action
-  MAX_MERGE_NUM: 5
+  MAX_MERGE_NUM: 5,
+  // the extra margin used for debug printing boundaries
+  DEBUG_PRINT_BOUNDARY_MARGIN: 2,
+  // margin used when translating blocks to character locations
+  // this is used to add some extra buffer for character recognition
+  CHAR_LOC_MARGIN: 1
 };

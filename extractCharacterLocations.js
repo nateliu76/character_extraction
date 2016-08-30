@@ -8,7 +8,7 @@ const processSubbubble = require('./extract/processSubbubble');
 // API for extracting Chinese character locations in manga/comics
 // There are two methods available
 // 1. Get all possible character locations in the image matrix
-// 2. Get all possible character locations in the text bubble enclosing the 
+// 2. Get all possible character locations in the text bubble near the 
 //    given coordinate
 
 // The image matrix needs to be a greyscale 2D list of pixel values
@@ -19,8 +19,9 @@ module.exports = {
   getNearCoord: getNearCoord
 };
 
-// Given a 2d list of greyscale pixel values, return all possible locations of
-// Chinese characters that do not overlap.
+// Given an manga image represented in the format of a 2d list of greyscale 
+// pixel values, return all possible locations of Chinese characters that do 
+// not overlap.
 function getAll(matrix) {
   var startTime1 = new Date().getTime();
   var bubbles = processMatrix.getBubbles(matrix);
@@ -35,10 +36,14 @@ function getAll(matrix) {
   var endTime = new Date().getTime();
   
   if (constants.IS_DEBUG_PRINT_ALL_IN_FULL_IMG) {
+    // log the time it took to process the image
     console.log('\nFull run    : ', (endTime - startTime1) / 1000, 's');
     console.log('Get bubbles   : ', (startTime2 - startTime1) / 1000, 's');
     console.log('Get subbubbles: ', (startTime3 - startTime2) / 1000, 's');
     console.log('Get locations : ', (endTime - startTime3) / 1000, 's\n');
+    
+    // print/save locations of the bubbles, subbubbles, and character locations
+    // in images
     debugPrints(matrix, bubbles, subbubbles, charLocations);
   }
   return charLocations;
@@ -46,9 +51,9 @@ function getAll(matrix) {
 
 // Given a 2d list of greyscale pixel values and a coordinate, return all 
 // possible locations of Chinese characters in a manga/comic text bubble that
-// encloses the given coordinates. The locations do not overlap with each other.
+// is near the given coordinates.
 function getNearCoord(matrix, ycoord, xcoord) {
-  var bubble = processMatrix.getBubbleEnclosingCoord(matrix, ycoord, xcoord);
+  var bubble = processMatrix.getBubbleNearCoord(matrix, ycoord, xcoord);
   var subbubbles = processBubble.getSubbubbles([bubble]);
   var charLocations = 
       processSubbubble.getCharacterLocations(matrix, subbubbles);
@@ -67,5 +72,9 @@ function debugPrints(matrix, bubbles, subbubbles, charLocations) {
   imageUtil.debugPrintBoundariesWithOffsets(matrix, subbubbles, filename2);
   
   var filename3 = '0_2_char_locations_in_full_img.png';
-  imageUtil.debugPrintBoundaries(matrix, charLocations, filename3);
+  imageUtil.debugPrintBoundaries(
+      matrix, 
+      charLocations, 
+      filename3, 
+      constants.DEBUG_PRINT_BOUNDARY_MARGIN - constants.CHAR_LOC_MARGIN);
 }

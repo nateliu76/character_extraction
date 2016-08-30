@@ -22,7 +22,7 @@ const util = require('./utils/util');
 
 module.exports = {
   getBubbles: getBubbles,
-  getBubbleEnclosingCoord: getBubbleEnclosingCoord
+  getBubbleNearCoord: getBubbleNearCoord
 };
 
 // Get all possible bubbles that are in the matrix.
@@ -62,13 +62,13 @@ function getBubbles(matrix) {
   return bubbles;
 }
 
-function getBubbleEnclosingCoord(matrix, ycoord, xcoord) {
-  console.log('\ngetting bubble enclosing', ycoord, xcoord, '...');
+function getBubbleNearCoord(matrix, ycoord, xcoord) {
+  console.log('\ngetting bubble near', ycoord, xcoord, '...');
   
   var visitedWhitePix = util.initNewArrayWithVal(matrix, 0);
   
   var bubbleParams = 
-      getBubbleParamsEnclosingCoords(matrix, ycoord, xcoord, visitedWhitePix);
+      getBubbleParamsNearCoords(matrix, ycoord, xcoord, visitedWhitePix);
   
   if (bubbleParams.bubbleFound) {
     var bubbleIdx = bubbleParams.bubbleIdx;
@@ -120,8 +120,7 @@ function debugPrintBubble(
 // a wrapping function around getBubbleParams() that uses BFS to find the white
 // pixels of the bubble (as opposed to iterating through every pixel as seen
 // in getBubbles()
-function getBubbleParamsEnclosingCoords(
-    matrix, ycoord, xcoord, visitedWhitePix) {
+function getBubbleParamsNearCoords(matrix, ycoord, xcoord, visitedWhitePix) {
   var bubbleIdx = 0;
   var ylen = matrix.length - 1;
   var xlen = matrix[0].length - 1;

@@ -1,3 +1,4 @@
+const constants = require('./constants');
 const jimp = require('jimp');
 const obj = require('../obj');
 const util = require('./util');
@@ -8,7 +9,6 @@ const HIGHLIGHT_GREY = -3;
 const GREEN_HEX = jimp.rgbaToInt(0, 255, 0, 255);
 const BLUE_HEX = jimp.rgbaToInt(0, 255, 255, 255);
 const GREY_HEX = jimp.rgbaToInt(125, 125, 125, 255);
-const MARGIN = 2;
 
 // Methods used to interact with Jimp
 // includes image saving for debugging, and helper methods that help generate
@@ -82,10 +82,10 @@ function debugPrintBoundary(matrix, boundary, filename) {
   debugPrintBoundaries(matrix, [boundary], filename);
 }
 
-function debugPrintBoundaries(matrix, boundaries, filename) {
+function debugPrintBoundaries(matrix, boundaries, filename, margin) {
   var arr = copyMatrix(matrix);
   for (var i = 0; i < boundaries.length; i++) {
-    markBoundary(arr, boundaries[i], HIGHLIGHT_GREEN);
+    markBoundary(arr, boundaries[i], HIGHLIGHT_GREEN, margin);
   }
   saveImage(arr, filename);
 }
@@ -129,18 +129,21 @@ function markPixels(matrix, boundary, shouldMark, markIdx, color) {
   }
 }
 
-function markBoundary(matrix, boundary, color) {
+function markBoundary(matrix, boundary, color, margin) {
+  if (typeof margin === "undefined") {
+    margin = constants.DEBUG_PRINT_BOUNDARY_MARGIN;
+  }
   var ymin = boundary.ymin;
   var ymax = boundary.ymax;
   var xmin = boundary.xmin;
   var xmax = boundary.xmax;
   
-  var ymin = ymin >= MARGIN ? ymin - MARGIN : 0;
+  var ymin = ymin >= margin ? ymin - margin : 0;
   var ymax = 
-      (ymax + MARGIN < matrix.length) ? ymax + MARGIN : matrix.length - 1;
-  var xmin = xmin >= MARGIN ? xmin - MARGIN : 0;
+      (ymax + margin < matrix.length) ? ymax + margin : matrix.length - 1;
+  var xmin = xmin >= margin ? xmin - margin : 0;
   var xmax = 
-      (xmax + MARGIN < matrix[0].length) ? xmax + MARGIN : matrix[0].length - 1;
+      (xmax + margin < matrix[0].length) ? xmax + margin : matrix[0].length - 1;
   
   for (var i = ymin; i <= ymax; i++) {
     matrix[i][xmin] = color;

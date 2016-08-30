@@ -1,6 +1,8 @@
 const constants = require('./utils/constants');
 const util = require('./utils/util');
 
+const MARGIN = 2;
+
 // Container objects used
 
 module.exports = {
@@ -53,12 +55,25 @@ function Block(ymin, ymax, xmin, xmax, blackPixCount) {
   }
 }
 
-// A stripped down version of the Block object
-function CharacterLocation(block) {
-  this.ymin = block.ymin + block.yoffset;
-  this.ymax = block.ymax + block.yoffset;
-  this.xmin = block.xmin + block.xoffset;
-  this.xmax = block.xmax + block.xoffset;
+// A stripped down version of the Block object, with added margins
+function CharacterLocation(block, matrix) {
+  var ymin = block.ymin + block.yoffset;
+  var ymax = block.ymax + block.yoffset;
+  var xmin = block.xmin + block.xoffset;
+  var xmax = block.xmax + block.xoffset;
+  
+  this.ymin = 
+      ymin >= constants.CHAR_LOC_MARGIN ? ymin - constants.CHAR_LOC_MARGIN : 0;
+  this.ymax = 
+      ((ymax + constants.CHAR_LOC_MARGIN < matrix.length) 
+          ? ymax + constants.CHAR_LOC_MARGIN 
+          : matrix.length - 1);
+  this.xmin = 
+      xmin >= constants.CHAR_LOC_MARGIN ? xmin - constants.CHAR_LOC_MARGIN : 0;
+  this.xmax = 
+      ((xmax + constants.CHAR_LOC_MARGIN < matrix[0].length) 
+          ? xmax + constants.CHAR_LOC_MARGIN 
+          : matrix[0].length - 1);
   this.blackPixCount = block.blackPixCount;
 }
 

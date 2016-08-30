@@ -371,7 +371,7 @@ function postProcessBlocks(matrix, blocks) {
   var resolvedBlocks = resolveOverlappingBlocks(matrix, blocks); 
   return resolvedBlocks.map(
       function(block) {
-        return new obj.CharacterLocation(block);
+        return new obj.CharacterLocation(block, matrix);
       });
 }
 
