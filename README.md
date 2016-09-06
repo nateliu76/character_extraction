@@ -34,11 +34,7 @@ Blocks in green are the major parts of the current program, the blue part is imp
 
 ### Example of the pipeline at various stages
 
-Process the [image here](https://cloud.githubusercontent.com/assets/7884896/18254911/0d993610-7371-11e6-96b3-eab3243830b0.jpg) to find all Chinese character locations:
-
-(Only the top left bubble will be shown for demoing purposes)
-
-<br/>
+[This image](https://cloud.githubusercontent.com/assets/7884896/18254911/0d993610-7371-11e6-96b3-eab3243830b0.jpg) is used for the following demo to find all Chinese character locations. Only the top left bubble will be shown for demoing purposes:
 
 **Find Bubble(s) in image/Find Bubble near given coordinate:**
 
@@ -60,7 +56,7 @@ Process the [image here](https://cloud.githubusercontent.com/assets/7884896/1825
 
 ### More examples
 
-Examples of the program finding all Character locations in an image (instead of just one Bubble as shown above)
+Examples of the program finding all Character locations in an image (instead of just one Bubble as shown above):
 
 [Example 1](https://cloud.githubusercontent.com/assets/7884896/18255202/014fceec-7375-11e6-8ac9-18dcbd6be936.png)
 
